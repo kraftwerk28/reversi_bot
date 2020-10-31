@@ -2,7 +2,7 @@ pub mod game;
 pub mod utils;
 
 use game::*;
-use utils::*;
+use utils::EndState::*;
 
 fn main() {
     let mut game = GameState::new("bot.log");
@@ -10,10 +10,10 @@ fn main() {
     println!(
         "{}",
         match game.win_state {
-            EndState::Tie => "Tie!",
-            EndState::BlackWon => "White won!",
-            EndState::WhiteWon => "Black won!",
-            _ => "An error occured",
+            Tie => "Tie!",
+            BlackWon => "White won!",
+            WhiteWon => "Black won!",
+            _ => "Game hadn't been completed.",
         }
     );
 }

@@ -1,10 +1,5 @@
 use rand::{thread_rng, Rng};
-use std::{
-    char,
-    collections::HashMap,
-    io::{stdin, Read},
-    process,
-};
+use std::{char, collections::HashMap, io::stdin, process};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Cell {
@@ -14,6 +9,7 @@ pub enum Cell {
     BlackHole,
 }
 
+#[derive(Clone, Copy)]
 pub enum EndState {
     Unknown,
     WhiteWon,
