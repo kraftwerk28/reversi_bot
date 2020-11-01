@@ -4,6 +4,7 @@ use std::{
     fs::{File, OpenOptions},
     io::Write,
     time::Instant,
+    usize,
 };
 
 // A small logging util
@@ -25,7 +26,7 @@ pub struct GameState {
     was_passed: bool,
 }
 
-const MM_MAXDEPTH: usize = 8;
+const MM_MAXDEPTH: usize = 5;
 
 impl GameState {
     pub fn new(log_file_name: &str) -> GameState {
@@ -103,15 +104,8 @@ impl GameState {
         self.allowed_moves = self.get_allowed_moves();
         log!(self, "awailable tiles: {}", self.allowed_moves.len());
 
-        if self.allowed_moves.len() == 0 {
-            log!(self, "passing move");
-            if self.was_passed {
-                self.win_state = EndState::Tie;
-                return;
-            }
-            self.current_color = opposize_color(self.current_color);
-            self.was_passed = true;
-            self.step();
+        self.check_win_state();
+        if self.win_state != EndState::Unknown {
             return;
         }
 
@@ -126,12 +120,13 @@ impl GameState {
 
     fn place_disc(&mut self) {
         let now = Instant::now();
+        let init_ab = (Score::MIN, Score::MAX);
         let best_move = self
             .allowed_moves
             .par_iter()
             .max_by(|move1, move2| {
-                let sc1 = self.minimax(move1, 0);
-                let sc2 = self.minimax(move2, 0);
+                let sc1 = self.minimax(move1, 0, init_ab, true);
+                let sc2 = self.minimax(move2, 0, init_ab, true);
                 sc1.cmp(&sc2)
             })
             .unwrap();
@@ -176,21 +171,46 @@ impl GameState {
         }
     }
 
-    fn minimax(&self, player_move: &PlayerMove, depth: usize) -> Score {
+    fn minimax(
+        &self,
+        player_move: &PlayerMove,
+        depth: usize,
+        ab_range: AlphaBeta,
+        is_max: bool,
+    ) -> Score {
         if depth >= MM_MAXDEPTH || self.allowed_moves.len() == 0 {
-            return self.sev(player_move);
+            return self.sev(player_move, is_max);
         }
 
         let new_state = self.copy_with_step(player_move);
         let moves_iter = new_state.allowed_moves.iter();
-        let minimaxes =
-            moves_iter.map(|playermove| self.minimax(playermove, depth + 1));
-        if self.is_max() {
-            minimaxes.max()
+
+        let (mut alpha, mut beta) = ab_range;
+        if is_max {
+            let mut max_sev = Score::MIN;
+            for player_move in moves_iter {
+                let sev =
+                    self.minimax(player_move, depth + 1, (alpha, beta), false);
+                max_sev = max_of(max_sev, sev);
+                alpha = max_of(alpha, sev);
+                if beta <= alpha {
+                    break;
+                }
+            }
+            max_sev
         } else {
-            minimaxes.min()
+            let mut min_sev = Score::MAX;
+            for player_move in moves_iter {
+                let sev =
+                    self.minimax(player_move, depth + 1, (alpha, beta), true);
+                min_sev = min_of(min_sev, sev);
+                beta = min_of(beta, sev);
+                if beta <= alpha {
+                    break;
+                }
+            }
+            min_sev
         }
-        .unwrap()
     }
 
     fn copy_with_step(&self, player_move: &PlayerMove) -> Self {
@@ -213,13 +233,39 @@ impl GameState {
         dummy_state
     }
 
-    fn is_max(&self) -> bool {
-        // NB: uncomment for regular reversi
-        // (self.my_color == self.current_color)
-        !(self.my_color == self.current_color)
+    fn sev(&self, player_move: &PlayerMove, is_max: bool) -> Score {
+        if is_max {
+            500 - player_move.1.len()
+        } else {
+            player_move.1.len()
+        }
     }
 
-    fn sev(&self, player_move: &PlayerMove) -> Score {
-        player_move.1.len()
+    fn check_win_state(&mut self) {
+        if self.allowed_moves.len() == 0 {
+            let mut nblack = 0;
+            let mut nempty = 0;
+            for disc in self.board.iter() {
+                match disc {
+                    Cell::Black => nblack += 1,
+                    Cell::Empty => {
+                        nempty += 1;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            if nempty > 0 {
+                if self.was_passed {
+                    self.win_state == EndState::Tie;
+                }
+                self.was_passed = true;
+                self.current_color = opposize_color(self.current_color);
+            } else if nblack >= 32 {
+                self.win_state = EndState::WhiteWon;
+            } else {
+                self.win_state = EndState::BlackWon;
+            }
+        }
     }
 }

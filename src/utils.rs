@@ -21,6 +21,7 @@ pub type PlayerMove = (TileIdx, Vec<TileIdx>);
 pub type Point = (TileIdx, TileIdx);
 pub type AllowedMoves = Vec<PlayerMove>;
 pub type Score = usize;
+pub type AlphaBeta = (Score, Score);
 
 pub fn i2p(i: TileIdx) -> Point {
     (i % 8, i / 8)
@@ -118,4 +119,20 @@ pub fn repr_board(board: &[Cell]) -> String {
         .map(|row| row.join(""))
         .collect::<Vec<String>>()
         .join("\n")
+}
+
+pub fn max_of(s1: Score, s2: Score) -> Score {
+    if s1 > s2 {
+        s1
+    } else {
+        s2
+    }
+}
+
+pub fn min_of(s1: Score, s2: Score) -> Score {
+    if s1 > s2 {
+        s2
+    } else {
+        s1
+    }
 }

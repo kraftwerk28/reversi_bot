@@ -11,8 +11,8 @@ fn main() {
         "{}",
         match game.win_state {
             Tie => "Tie!",
-            BlackWon => "White won!",
-            WhiteWon => "Black won!",
+            BlackWon => "Black won!",
+            WhiteWon => "White won!",
             _ => "Game hadn't been completed.",
         }
     );
