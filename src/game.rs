@@ -18,14 +18,14 @@ macro_rules! log {
 pub struct GameState {
     pub board: [Cell; 64],
     pub current_color: Cell,
-    pub my_color: Cell,
     pub win_state: EndState,
-    log_file: Option<File>,
+    my_color: Cell,
     allowed_moves: AllowedMoves,
+    log_file: Option<File>,
     was_passed: bool,
 }
 
-const MM_MAXDEPTH: usize = 4;
+const MM_MAXDEPTH: usize = 8;
 
 impl GameState {
     pub fn new(log_file_name: &str) -> GameState {
@@ -126,13 +126,23 @@ impl GameState {
 
     fn place_disc(&mut self) {
         let now = Instant::now();
-        let (tile_index, flip_row) = self.minimax();
+        let best_move = self
+            .allowed_moves
+            .par_iter()
+            .max_by(|move1, move2| {
+                let sc1 = self.minimax(move1, 0);
+                let sc2 = self.minimax(move2, 0);
+                sc1.cmp(&sc2)
+            })
+            .unwrap();
+        let tile_index = best_move.0;
+        let flip_row = best_move.1.clone();
         let ab = p2ab(i2p(tile_index));
-        println!("{}", ab);
+        Chan::send_coord(i2p(tile_index));
         log!(self, "my move: {}", ab);
 
         self.board[tile_index as usize] = self.current_color;
-        for &tile_index in flip_row.iter() {
+        for tile_index in flip_row {
             self.board[tile_index as usize] = self.current_color;
         }
         log!(self, "step duration: {}ms", now.elapsed().as_millis());
@@ -151,7 +161,7 @@ impl GameState {
             .1
             .clone();
         self.board[p2i(coord) as usize] = self.current_color;
-        for &tile_index in flip_row.iter() {
+        for tile_index in flip_row {
             self.board[tile_index as usize] = self.current_color;
         }
     }
@@ -166,49 +176,21 @@ impl GameState {
         }
     }
 
-    fn minimax(&mut self) -> PlayerMove {
-        if self.allowed_moves.len() == 1 {
-            let (tile, row) = self.allowed_moves.iter().next().unwrap();
-            return (*tile, row.to_owned());
+    fn minimax(&self, player_move: &PlayerMove, depth: usize) -> Score {
+        if depth >= MM_MAXDEPTH || self.allowed_moves.len() == 0 {
+            return self.sev(player_move);
         }
-        self.allowed_moves
-            .par_iter()
-            .max_by(|m1, m2| {
-                let score1 = self.copy_with_step(m1).calc_mm_score(0, 0);
-                let score2 = self.copy_with_step(m2).calc_mm_score(0, 0);
-                score1.cmp(&score2)
-            })
-            .map(|(tile, row)| (*tile, row.clone()))
-            .unwrap()
-    }
 
-    fn calc_mm_score(self, depth: usize, parent_score: usize) -> usize {
-        if self.allowed_moves.len() == 0 {
-            return 0;
-        }
-        let score = {
-            let lens =
-                self.allowed_moves.iter().map(|flip_row| flip_row.1.len());
-            // Ex-change this things to make it regular reversi game
-            if self.current_color == self.my_color {
-                lens.min()
-            } else {
-                lens.max()
-            }
-            .unwrap()
-        };
-        if depth >= MM_MAXDEPTH {
-            score
+        let new_state = self.copy_with_step(player_move);
+        let moves_iter = new_state.allowed_moves.iter();
+        let minimaxes =
+            moves_iter.map(|playermove| self.minimax(playermove, depth + 1));
+        if self.is_max() {
+            minimaxes.max()
         } else {
-            let sub_score: usize = self
-                .allowed_moves
-                .iter()
-                .map(|t| {
-                    self.copy_with_step(&t).calc_mm_score(depth + 1, score)
-                })
-                .sum();
-            score + sub_score
+            minimaxes.min()
         }
+        .unwrap()
     }
 
     fn copy_with_step(&self, player_move: &PlayerMove) -> Self {
@@ -229,5 +211,15 @@ impl GameState {
         };
         dummy_state.allowed_moves = dummy_state.get_allowed_moves();
         dummy_state
+    }
+
+    fn is_max(&self) -> bool {
+        // NB: uncomment for regular reversi
+        // (self.my_color == self.current_color)
+        !(self.my_color == self.current_color)
+    }
+
+    fn sev(&self, player_move: &PlayerMove) -> Score {
+        player_move.1.len()
     }
 }

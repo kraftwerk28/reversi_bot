@@ -1,5 +1,5 @@
-pub mod game;
-pub mod utils;
+mod game;
+mod utils;
 
 use game::*;
 use utils::EndState::*;

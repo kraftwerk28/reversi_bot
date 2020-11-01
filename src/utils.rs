@@ -1,5 +1,4 @@
-use rand::{thread_rng, Rng};
-use std::{char, collections::HashMap, io::stdin, process};
+use std::{char, io::stdin, process};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Cell {
@@ -9,7 +8,7 @@ pub enum Cell {
     BlackHole,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum EndState {
     Unknown,
     WhiteWon,
@@ -17,19 +16,11 @@ pub enum EndState {
     Tie,
 }
 
-pub fn create_black_hole() -> usize {
-    let mut rng = thread_rng();
-    if rng.gen_bool(0.5) {
-        rng.gen_range(0, 8 * 3 + 4 - 1)
-    } else {
-        rng.gen_range(8 * 4 + 5, 64)
-    }
-}
-
 pub type TileIdx = i8;
 pub type PlayerMove = (TileIdx, Vec<TileIdx>);
 pub type Point = (TileIdx, TileIdx);
 pub type AllowedMoves = Vec<PlayerMove>;
+pub type Score = usize;
 
 pub fn i2p(i: TileIdx) -> Point {
     (i % 8, i / 8)
