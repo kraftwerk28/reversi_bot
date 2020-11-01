@@ -166,22 +166,21 @@ impl GameState {
             return (tile, row.to_owned());
         }
         self.allowed_moves
-            .iter()
+            .par_iter()
             .max_by(|&t1, &t2| {
-                let score1 = self.copy_with_step(*t1.0).calc_mm_score(0);
-                let score2 = self.copy_with_step(*t2.0).calc_mm_score(0);
+                let score1 = self.copy_with_step(*t1.0).calc_mm_score(0, 0);
+                let score2 = self.copy_with_step(*t2.0).calc_mm_score(0, 0);
                 score1.cmp(&score2)
             })
             .map(|t| (*t.0, t.1.clone()))
             .unwrap()
     }
 
-    fn calc_mm_score(self, depth: usize) -> usize {
-        let nallowed = self.allowed_moves.len();
+    fn calc_mm_score(self, depth: usize, parent_score: usize) -> usize {
         if self.allowed_moves.len() == 0 {
             return 0;
         }
-        if depth >= MM_MAXDEPTH || nallowed == 0 {
+        let score = {
             let lens =
                 self.allowed_moves.values().map(|flip_row| flip_row.len());
             // Ex-change this things to make it regular reversi game
@@ -191,13 +190,19 @@ impl GameState {
                 lens.max()
             }
             .unwrap()
+        };
+        if depth >= MM_MAXDEPTH {
+            score
         } else {
-            self.allowed_moves
+            let sub_score: usize = self
+                .allowed_moves
                 .iter()
                 .map(|(tile_index, _)| {
-                    self.copy_with_step(*tile_index).calc_mm_score(depth + 1)
+                    self.copy_with_step(*tile_index)
+                        .calc_mm_score(depth + 1, score)
                 })
-                .sum()
+                .sum();
+            score + sub_score
         }
     }
 
