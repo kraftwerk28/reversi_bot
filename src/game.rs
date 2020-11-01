@@ -1,7 +1,6 @@
 use crate::utils::*;
 use rayon::prelude::*;
 use std::{
-    collections::HashMap,
     fs::{File, OpenOptions},
     io::Write,
     time::Instant,
@@ -53,13 +52,14 @@ impl GameState {
             my_color,
             win_state: EndState::Unknown,
             log_file: Some(log_file),
-            allowed_moves: HashMap::new(),
+            allowed_moves: Vec::new(),
             was_passed: false,
         }
     }
 
     fn get_allowed_moves(&self) -> AllowedMoves {
-        let mut res: AllowedMoves = HashMap::new();
+        // let mut res: AllowedMoves = HashMap::new();
+        let mut res: AllowedMoves = Vec::new();
         let rev_color = opposize_color(self.current_color);
         let only_current_tiles = self
             .board
@@ -80,11 +80,13 @@ impl GameState {
                     } else {
                         if tile == Cell::Empty && to_be_flipped.len() > 0 {
                             let old_row = res
-                                .get(&tile_index)
-                                .map(|v| v.clone())
-                                .unwrap_or(vec![]);
-                            to_be_flipped.extend(old_row);
-                            res.insert(tile_index, to_be_flipped);
+                                .iter_mut()
+                                .find(|(t_i, _)| *t_i == tile_index);
+                            if let Some(p_move) = old_row {
+                                p_move.1.extend(to_be_flipped);
+                            } else {
+                                res.push((tile_index, to_be_flipped));
+                            }
                         }
                         break;
                     }
@@ -140,10 +142,14 @@ impl GameState {
         let coord = Chan::read_coord();
         log!(self, "their move: {}", p2ab(coord));
 
+        let tile_index = p2i(coord);
         let flip_row = self
             .allowed_moves
-            .get(&p2i(coord))
-            .expect("Not a possible move from opponent.");
+            .iter()
+            .find(|(t_i, _)| *t_i == tile_index)
+            .expect("Not a possible move from opponent.")
+            .1
+            .clone();
         self.board[p2i(coord) as usize] = self.current_color;
         for &tile_index in flip_row.iter() {
             self.board[tile_index as usize] = self.current_color;
@@ -160,19 +166,19 @@ impl GameState {
         }
     }
 
-    fn minimax(&mut self) -> (TileIdx, Vec<TileIdx>) {
+    fn minimax(&mut self) -> PlayerMove {
         if self.allowed_moves.len() == 1 {
-            let (&tile, row) = self.allowed_moves.iter().next().unwrap();
-            return (tile, row.to_owned());
+            let (tile, row) = self.allowed_moves.iter().next().unwrap();
+            return (*tile, row.to_owned());
         }
         self.allowed_moves
             .par_iter()
-            .max_by(|&t1, &t2| {
-                let score1 = self.copy_with_step(*t1.0).calc_mm_score(0, 0);
-                let score2 = self.copy_with_step(*t2.0).calc_mm_score(0, 0);
+            .max_by(|m1, m2| {
+                let score1 = self.copy_with_step(m1).calc_mm_score(0, 0);
+                let score2 = self.copy_with_step(m2).calc_mm_score(0, 0);
                 score1.cmp(&score2)
             })
-            .map(|t| (*t.0, t.1.clone()))
+            .map(|(tile, row)| (*tile, row.clone()))
             .unwrap()
     }
 
@@ -182,7 +188,7 @@ impl GameState {
         }
         let score = {
             let lens =
-                self.allowed_moves.values().map(|flip_row| flip_row.len());
+                self.allowed_moves.iter().map(|flip_row| flip_row.1.len());
             // Ex-change this things to make it regular reversi game
             if self.current_color == self.my_color {
                 lens.min()
@@ -197,23 +203,28 @@ impl GameState {
             let sub_score: usize = self
                 .allowed_moves
                 .iter()
-                .map(|(tile_index, _)| {
-                    self.copy_with_step(*tile_index)
-                        .calc_mm_score(depth + 1, score)
+                .map(|t| {
+                    self.copy_with_step(&t).calc_mm_score(depth + 1, score)
                 })
                 .sum();
             score + sub_score
         }
     }
 
-    fn copy_with_step(&self, tile_index: TileIdx) -> Self {
+    fn copy_with_step(&self, player_move: &PlayerMove) -> Self {
+        let (tile_index, flip_row) = player_move;
         let mut new_board = self.board.clone();
-        new_board[tile_index as usize] = self.current_color;
+
+        new_board[*tile_index as usize] = self.current_color;
+        for &tile in flip_row {
+            new_board[tile as usize] = self.current_color;
+        }
+
         let mut dummy_state = Self {
             board: new_board,
             current_color: opposize_color(self.current_color),
             log_file: None,
-            allowed_moves: HashMap::new(),
+            allowed_moves: Vec::new(),
             ..*self
         };
         dummy_state.allowed_moves = dummy_state.get_allowed_moves();

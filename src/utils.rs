@@ -27,7 +27,9 @@ pub fn create_black_hole() -> usize {
 }
 
 pub type TileIdx = i8;
+pub type PlayerMove = (TileIdx, Vec<TileIdx>);
 pub type Point = (TileIdx, TileIdx);
+pub type AllowedMoves = Vec<PlayerMove>;
 
 pub fn i2p(i: TileIdx) -> Point {
     (i % 8, i / 8)
@@ -66,8 +68,6 @@ pub fn input() -> String {
         }
     }
 }
-
-pub type AllowedMoves = HashMap<TileIdx, Vec<TileIdx>>;
 
 pub struct Chan {}
 
