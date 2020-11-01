@@ -36,5 +36,5 @@ jobs:
           # https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
           upload_url: ${{ steps.create-release.outputs.upload_url }} 
           asset_path: .\target\release\reversi_bot.exe
-          asset_name: reversi_bot_win64.zip
+          asset_name: reversi_bot_win64.exe
           asset_content_type: application/zip
