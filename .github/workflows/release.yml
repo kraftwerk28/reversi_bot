@@ -13,6 +13,7 @@ jobs:
           rust-version: stable
       - name: Build binary
         run: |
+          cargo --version
           cargo build --release
           ls -l ./
           ls -l ./target/release/
