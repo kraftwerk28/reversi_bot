@@ -19,7 +19,7 @@ jobs:
 
       - name: Get version
         id: get-version
-        run: echo ::set-output name=bin_version::$(cargo run --release -- -v)
+        run: echo "::set-output name=bin_version::$(cargo run --release -- -v)"
 
       - name: Check version
         run: echo ${{ steps.get-version.outputs.bin_version }}
