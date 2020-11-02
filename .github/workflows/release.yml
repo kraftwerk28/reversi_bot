@@ -19,7 +19,7 @@ jobs:
 
       - name: Get version
         id: get-version
-        run: echo ::set-output name=bin_version::$(cargo run -- --version)
+        run: echo ::set-output name=bin_version::$(cargo run --release -- -v)
 
       - name: Create Release
         id: create-release
