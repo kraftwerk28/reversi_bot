@@ -12,16 +12,18 @@ jobs:
         with:
           rust-version: stable
       - name: Build binary
-        run: |
-          cargo build --release
-          echo "BIN_VERSION=$(cargo run -- --version)" >> $GITHUB_ENV
+        id: build-bin
+        run: cargo build --release
+      - name: Get version
+        id: get-version
+        run: echo ::set-output name=bin_version::$(cargo run -- --version)
       - name: Create Release
         id: create-release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.BIN_VERSION }}
+          tag_name: ${{ steps.get-version.outputs.bin_version }}
           draft: false
           prerelease: false
       - name: Upload Release
