@@ -30,7 +30,7 @@ impl GameState {
 
     pub fn run_minimax(&mut self, color: Cell, max_depth: usize) -> Point {
         let best_score = {
-            let best_score = Score::MAX;
+            let best_score = Score::MIN;
             let best = (self.allowed_moves.first().unwrap(), best_score);
             Mutex::new(best)
         };
@@ -42,7 +42,7 @@ impl GameState {
                 self.minimax(color, player_move, max_depth, alphabeta, true);
             let mut lck = best_score.lock().unwrap();
             let best_score = (*lck).1;
-            if score < best_score {
+            if score > best_score {
                 *lck = (player_move, score);
             }
         });
@@ -138,7 +138,8 @@ impl GameState {
     }
 
     fn static_eval(&self, color: Cell) -> Score {
-        self.board.iter().filter(|cell| **cell == color).count()
+        let opcolor = opposite_color(color);
+        self.board.iter().filter(|cell| **cell == opcolor).count()
     }
 
     pub fn update_allowed(&mut self, color: Cell) {
