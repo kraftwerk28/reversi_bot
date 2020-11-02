@@ -14,6 +14,7 @@ pub enum EndState {
     WhiteWon,
     BlackWon,
     Tie,
+    OnePass,
 }
 
 pub type TileIdx = i8;
@@ -39,7 +40,7 @@ pub fn p2ab(p: Point) -> String {
     )
 }
 
-pub fn opposize_color(color: Cell) -> Cell {
+pub fn opposite_color(color: Cell) -> Cell {
     match color {
         Cell::White => Cell::Black,
         Cell::Black => Cell::White,
@@ -135,4 +136,42 @@ pub fn min_of(s1: Score, s2: Score) -> Score {
     } else {
         s1
     }
+}
+
+pub fn get_allowed_moves(board: &[Cell], color: Cell) -> AllowedMoves {
+    let mut res: AllowedMoves = Vec::new();
+    let rev_color = opposite_color(color);
+    let only_current_tiles =
+        board.iter().enumerate().filter(|(_, &cell)| cell == color);
+
+    for (index, _) in only_current_tiles {
+        let (x, y) = i2p(index as TileIdx);
+
+        for (dx, dy) in TRAVERSE_DIRECTIONS.iter() {
+            let (mut x, mut y) = (x + dx, y + dy);
+            let mut to_be_flipped: Vec<TileIdx> = Vec::with_capacity(6);
+            while (0..8).contains(&x) && (0..8).contains(&y) {
+                let tile_index = p2i((x, y));
+                let tile = board[p2i((x, y)) as usize];
+                if tile == rev_color {
+                    to_be_flipped.push(tile_index);
+                } else {
+                    if tile == Cell::Empty && to_be_flipped.len() > 0 {
+                        let old_row =
+                            res.iter_mut().find(|(t_i, _)| *t_i == tile_index);
+                        if let Some(p_move) = old_row {
+                            p_move.1.extend(to_be_flipped);
+                        } else {
+                            res.push((tile_index, to_be_flipped));
+                        }
+                    }
+                    break;
+                }
+                x += dx;
+                y += dy;
+            }
+        }
+    }
+
+    res
 }

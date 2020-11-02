@@ -1,8 +1,10 @@
+mod bot;
 mod game;
 mod utils;
 
+use bot::*;
 use clap::{App, AppSettings, Arg};
-use game::*;
+use std::str;
 use utils::EndState::*;
 
 fn main() {
@@ -14,6 +16,19 @@ fn main() {
                 .long("version")
                 .help("Show version"),
         )
+        .arg(
+            Arg::with_name("max_depth")
+                .long("depth")
+                .takes_value(true)
+                .default_value("8")
+                .help("Maximum tree depth"),
+        )
+        .arg(
+            Arg::with_name("log_file")
+                .long("log")
+                .takes_value(true)
+                .help("File for logging"),
+        )
         .get_matches();
 
     if matches.is_present("version") {
@@ -21,11 +36,11 @@ fn main() {
         return;
     }
 
-    let mut game = GameState::new("bot.log");
-    game.run();
+    let mut bot = Bot::new(&matches);
+    bot.run();
     println!(
         "{}",
-        match game.win_state {
+        match bot.win_state {
             Tie => "Tie!",
             BlackWon => "Black won!",
             WhiteWon => "White won!",
