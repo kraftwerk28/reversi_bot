@@ -21,23 +21,26 @@ jobs:
         id: get-version
         run: echo ::set-output name=bin_version::$(cargo run --release -- -v)
 
-      - name: Create Release
-        id: create-release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.get-version.outputs.bin_version }}
-          draft: false
-          prerelease: false
+      - name: Check version
+        run: echo ${{ steps.get-version.outputs.bin_version }}
 
-      - name: Upload Release
-        id: upload-release-asset 
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create-release.outputs.upload_url }} 
-          asset_path: .\target\release\reversi_bot.exe
-          asset_name: reversi_bot_win64.exe
-          asset_content_type: application/zip
+      # - name: Create Release
+      #   id: create-release
+      #   uses: actions/create-release@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     tag_name: ${{ steps.get-version.outputs.bin_version }}
+      #     draft: false
+      #     prerelease: false
+
+      # - name: Upload Release
+      #   id: upload-release-asset 
+      #   uses: actions/upload-release-asset@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ steps.create-release.outputs.upload_url }} 
+      #     asset_path: .\target\release\reversi_bot.exe
+      #     asset_name: reversi_bot_win64.exe
+      #     asset_content_type: application/zip
