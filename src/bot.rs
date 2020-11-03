@@ -23,6 +23,7 @@ pub struct Bot {
     pub current_color: Cell,
     max_tree_depth: usize,
     log_file: Option<RefCell<File>>,
+    is_anti: bool,
 }
 
 impl Bot {
@@ -43,6 +44,7 @@ impl Bot {
             .value_of("max_depth")
             .map(|s| s.parse::<usize>().unwrap())
             .unwrap();
+        let is_anti = !arg_matches.is_present("no-anti");
 
         Self {
             game_state: GameState::new(black_hole),
@@ -51,6 +53,7 @@ impl Bot {
             win_state: EndState::Unknown,
             current_color: Cell::Black,
             max_tree_depth,
+            is_anti,
         }
     }
 
@@ -76,9 +79,11 @@ impl Bot {
 
     fn my_move(&mut self) {
         let time = Instant::now();
-        let coord = self
-            .game_state
-            .run_minimax(self.my_color, self.max_tree_depth);
+        let coord = self.game_state.run_minimax(
+            self.my_color,
+            self.max_tree_depth,
+            self.is_anti,
+        );
         log!(
             self,
             "my move: {}; {}ms passed",

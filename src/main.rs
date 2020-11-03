@@ -29,6 +29,11 @@ fn main() {
                 .takes_value(true)
                 .help("File for logging"),
         )
+        .arg(
+            Arg::with_name("no-anti")
+                .long("no-anti")
+                .help("Play regular reversi"),
+        )
         .get_matches();
 
     if matches.is_present("version") {
