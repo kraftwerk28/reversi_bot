@@ -18,6 +18,29 @@ pub enum EndState {
     OnePass,
 }
 
+pub enum CLIMove {
+    Coord(Point),
+    Color(Cell),
+    Pass,
+}
+
+impl CLIMove {
+    pub fn coord(self) -> Point {
+        if let CLIMove::Coord(p) = self {
+            p
+        } else {
+            panic!("Expected coordinate")
+        }
+    }
+    pub fn color(self) -> Cell {
+        if let CLIMove::Color(c) = self {
+            c
+        } else {
+            panic!("Expected color")
+        }
+    }
+}
+
 pub type TileIdx = i8;
 pub type PlayerMove = (TileIdx, Vec<TileIdx>);
 pub type Point = (TileIdx, TileIdx);
@@ -66,26 +89,34 @@ pub fn input() -> String {
 pub struct Chan {}
 
 impl Chan {
-    pub fn read_coord() -> Point {
+    pub fn read() -> CLIMove {
         let s = input();
-        let mut chars = s.chars();
-        let x = chars.next().unwrap() as TileIdx;
-        let y = chars.next().and_then(|c| c.to_digit(10)).unwrap() as TileIdx;
-        assert!((1..=8).contains(&y), "Bad coordinate supplied");
-        assert!((65..=72).contains(&x), "Bad coordinate supplied");
-        (x - 65, y - 1)
-    }
-
-    pub fn read_color() -> Cell {
-        match input().to_lowercase().as_str() {
-            "black" => Cell::Black,
-            "white" => Cell::White,
-            _ => panic!("Bad color supplied"),
+        match s.as_str() {
+            "pass" => CLIMove::Pass,
+            "black" => CLIMove::Color(Cell::Black),
+            "white" => CLIMove::Color(Cell::White),
+            _ => {
+                let mut chars = s.chars();
+                let x = chars.next().unwrap() as TileIdx;
+                let y = chars.next().and_then(|c| c.to_digit(10)).unwrap()
+                    as TileIdx;
+                assert!((1..=8).contains(&y), "Bad coordinate supplied");
+                assert!((65..=72).contains(&x), "Bad coordinate supplied");
+                CLIMove::Coord((x - 65, y - 1))
+            }
         }
     }
 
-    pub fn send_coord(p: Point) {
-        println!("{}", p2ab(p));
+    pub fn send(p: CLIMove) {
+        match p {
+            CLIMove::Pass => {
+                println!("pass");
+            }
+            CLIMove::Coord(p) => {
+                println!("{}", p2ab(p));
+            }
+            _ => panic!("Unexpected command"),
+        }
     }
 }
 

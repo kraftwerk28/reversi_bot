@@ -179,7 +179,7 @@ dependencies = [
 
 [[package]]
 name = "reversi_bot"
-version = "0.2.1"
+version = "0.2.3"
 dependencies = [
  "clap",
  "rayon",
