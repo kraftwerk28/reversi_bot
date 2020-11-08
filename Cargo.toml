@@ -1,6 +1,6 @@
 [package]
 name = "reversi_bot"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["kraftwerk28 <kefirchik3@gmail.com>"]
 edition = "2018"
 

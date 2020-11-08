@@ -62,21 +62,22 @@ impl Bot {
         loop {
             self.wincheck();
             match self.win_state {
-                EndState::Unknown | EndState::OnePass => {}
-                _ => break,
+                EndState::Unknown => {
+                    if self.current_color == self.my_color {
+                        self.my_move();
+                    } else {
+                        self.their_move();
+                    }
+                    self.switch_player();
+                }
+                EndState::OnePass => {
+                    self.switch_player();
+                    log!(self, "{}", repr_board(&self.game_state.board));
+                }
+                _ => {
+                    break;
+                }
             };
-            if self.win_state == EndState::OnePass {
-                log!(self, "Passing move");
-            }
-            if self.current_color == self.my_color {
-                log!(self, "Making my move");
-                self.my_move();
-            } else {
-                log!(self, "Waiting for their move");
-                self.their_move();
-            }
-            self.switch_player();
-            log!(self, "{}", repr_board(&self.game_state.board));
         }
     }
 
@@ -103,7 +104,6 @@ impl Bot {
     }
 
     fn wincheck(&mut self) {
-        // TODO: handle case with only my circles!
         if self.game_state.allowed_moves.len() > 0 {
             self.win_state = EndState::Unknown;
             return;
@@ -134,7 +134,6 @@ impl Bot {
             }
         } else {
             self.win_state = EndState::OnePass;
-            self.switch_player();
         }
     }
 
