@@ -1,10 +1,11 @@
-use crate::game::GameState;
-use crate::utils::*;
+use crate::{game::GameState, utils::*};
 use clap::ArgMatches;
-use std::cell::RefCell;
-use std::fs::{File, OpenOptions};
-use std::io::Write;
-use std::time::Instant;
+use std::{
+    cell::RefCell,
+    fs::{File, OpenOptions},
+    io::Write,
+    time::Instant,
+};
 
 // A small logging util
 macro_rules! log {
@@ -59,22 +60,24 @@ impl Bot {
 
     pub fn run(&mut self) {
         loop {
+            self.wincheck();
             match self.win_state {
-                EndState::Unknown | EndState::OnePass => self.step(),
+                EndState::Unknown | EndState::OnePass => {}
                 _ => break,
+            };
+            if self.win_state == EndState::OnePass {
+                log!(self, "Passing move");
             }
+            if self.current_color == self.my_color {
+                log!(self, "Making my move");
+                self.my_move();
+            } else {
+                log!(self, "Waiting for their move");
+                self.their_move();
+            }
+            self.switch_player();
+            log!(self, "{}", repr_board(&self.game_state.board));
         }
-    }
-
-    fn step(&mut self) {
-        if self.current_color == self.my_color {
-            self.my_move();
-        } else {
-            self.their_move();
-        }
-        self.switch_player();
-        self.wincheck();
-        log!(self, "{}", repr_board(&self.game_state.board));
     }
 
     fn my_move(&mut self) {
@@ -101,34 +104,69 @@ impl Bot {
 
     fn wincheck(&mut self) {
         // TODO: handle case with only my circles!
-        if self.game_state.allowed_moves.len() == 0 {
-            let mut nblack = 0;
-            let mut are_empty = false;
-            for disc in self.game_state.board.iter() {
-                match disc {
-                    Cell::Empty => {
-                        are_empty = true;
-                    }
-                    Cell::Black => nblack += 1,
-                    _ => {}
+        if self.game_state.allowed_moves.len() > 0 {
+            self.win_state = EndState::Unknown;
+            return;
+        }
+        let mut nblack = 0;
+        let mut nwhite = 0;
+        let mut has_empty = false;
+        for disc in self.game_state.board.iter() {
+            match disc {
+                Cell::Empty => {
+                    has_empty = true;
                 }
-            }
+                Cell::White => nwhite += 1,
+                Cell::Black => nblack += 1,
+                _ => {}
+            };
+        }
 
-            if !are_empty || self.win_state == EndState::OnePass {
-                if nblack >= 32 {
-                    self.win_state = EndState::WhiteWon;
-                } else {
-                    self.win_state = EndState::BlackWon;
-                }
+        if nblack == 0 {
+            self.win_state = EndState::BlackWon;
+        } else if nwhite == 0 {
+            self.win_state = EndState::WhiteWon;
+        } else if !has_empty || self.win_state == EndState::OnePass {
+            if nblack >= 32 {
+                self.win_state = EndState::WhiteWon;
             } else {
-                self.win_state = EndState::OnePass;
-                self.switch_player();
+                self.win_state = EndState::BlackWon;
             }
+        } else {
+            self.win_state = EndState::OnePass;
+            self.switch_player();
         }
     }
 
     fn switch_player(&mut self) {
         self.current_color = opposite_color(self.current_color);
         self.game_state.update_allowed(self.current_color);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{bot::Bot, game::*, utils::*};
+    use std::convert::TryFrom;
+    #[test]
+    fn check_game_state_conds() {
+        let board = "_BBBBBBB\
+                     BBBBBBBB\
+                     BBBBBBBB\
+                     B_BWBBBB\
+                     BBBBWBBB\
+                     BBBBBBBB\
+                     BBBBBBBB\
+                     BBBBBBBB";
+        let game_state = GameState::try_from(board.to_string()).unwrap();
+        let mut bot = Bot {
+            game_state,
+            current_color: Cell::Black,
+            win_state: EndState::Unknown,
+            my_color: Cell::Black,
+            log_file: None,
+            max_tree_depth: 8,
+            is_anti: true,
+        };
     }
 }

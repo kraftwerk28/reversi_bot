@@ -8,7 +8,8 @@ pub enum Cell {
     BlackHole,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
+#[allow(dead_code)]
 pub enum EndState {
     Unknown,
     WhiteWon,
@@ -70,6 +71,8 @@ impl Chan {
         let mut chars = s.chars();
         let x = chars.next().unwrap() as TileIdx;
         let y = chars.next().and_then(|c| c.to_digit(10)).unwrap() as TileIdx;
+        assert!((1..=8).contains(&y), "Bad coordinate supplied");
+        assert!((65..=72).contains(&x), "Bad coordinate supplied");
         (x - 65, y - 1)
     }
 
@@ -110,16 +113,25 @@ pub fn repr_board(board: &[Cell]) -> String {
         };
         cells.last_mut().unwrap().push(cell_repr);
         col += 1;
-        if col == 8 {
+        if col == 8 && cells.len() < 8 {
             cells.push(Vec::with_capacity(8));
             col = 0;
         }
     }
-    cells
+    let letters = format!(
+        "  {}",
+        ('A'..='H')
+            .map(|c| format!(" {}", c))
+            .collect::<Vec<String>>()
+            .join("")
+    );
+    let brd = cells
         .iter()
-        .map(|row| row.join(""))
+        .enumerate()
+        .map(|(index, row)| format!(" {}{}", index + 1, row.join("")))
         .collect::<Vec<String>>()
-        .join("\n")
+        .join("\n");
+    format!("{}\n{}\n", letters, brd)
 }
 
 pub fn max_of(s1: Score, s2: Score) -> Score {

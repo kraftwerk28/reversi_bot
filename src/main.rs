@@ -4,8 +4,7 @@ mod utils;
 
 use bot::*;
 use clap::{App, AppSettings, Arg};
-use std::str;
-use utils::EndState::*;
+use utils::EndState;
 
 fn main() {
     let matches = App::new(env!("CARGO_PKG_NAME"))
@@ -46,9 +45,9 @@ fn main() {
     println!(
         "{}",
         match bot.win_state {
-            Tie => "Tie!",
-            BlackWon => "Black won!",
-            WhiteWon => "White won!",
+            EndState::Tie => "Tie!",
+            EndState::BlackWon => "Black won!",
+            EndState::WhiteWon => "White won!",
             _ => "Game hadn't been completed.",
         }
     );

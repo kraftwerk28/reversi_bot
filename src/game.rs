@@ -1,7 +1,6 @@
 use crate::utils::*;
 use rayon::prelude::*;
-use std::sync::Mutex;
-use std::usize;
+use std::{convert::TryFrom, sync::Mutex, usize};
 
 pub struct GameState {
     pub board: [Cell; 64],
@@ -155,5 +154,33 @@ impl GameState {
 
     pub fn update_allowed(&mut self, color: Cell) {
         self.allowed_moves = get_allowed_moves(&self.board, color);
+    }
+}
+
+impl TryFrom<String> for GameState {
+    type Error = String;
+    fn try_from(board_str: String) -> Result<Self, Self::Error> {
+        let mut board = [Cell::Empty; 64];
+        let mut idx = 0;
+        for ch in board_str.chars().filter(|ch| !ch.is_whitespace()) {
+            let cell = match ch {
+                'B' => Some(Cell::Black),
+                'H' => Some(Cell::BlackHole),
+                'W' => Some(Cell::White),
+                '_' => Some(Cell::Empty),
+                _ => None,
+            };
+            if let Some(cell) = cell {
+                board[idx] = cell;
+                idx += 1;
+            } else {
+                return Err(format!("Unexpected char inside board: {}", ch));
+            }
+        }
+        Ok(Self {
+            board,
+            allowed_moves: get_allowed_moves(&board, Cell::Black),
+            best_score: 0,
+        })
     }
 }
