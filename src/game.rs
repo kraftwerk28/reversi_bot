@@ -1,30 +1,29 @@
-use crate::utils::*;
+use crate::{board::Board, utils::*};
 use rayon::prelude::*;
 use std::{convert::TryFrom, sync::Mutex, usize};
 
 pub struct GameState {
-    pub board: [Cell; 64],
+    pub board: Board,
     pub allowed_moves: AllowedMoves,
     pub best_score: Score,
 }
 
 impl GameState {
-    pub fn new(black_hole: Point) -> GameState {
-        let board = [Cell::Empty; 64];
-        let mut state = GameState {
+    pub fn new(black_hole: Point) -> Self {
+        let board = Board::initial(black_hole);
+        GameState {
             board,
-            allowed_moves: Vec::new(),
+            allowed_moves: board.allowed_moves(Cell::Black),
             best_score: 0,
-        };
-        state
-            .set_cell((3, 3), Cell::White)
-            .set_cell((4, 4), Cell::White)
-            .set_cell((3, 4), Cell::Black)
-            .set_cell((4, 3), Cell::Black)
-            .set_cell(black_hole, Cell::BlackHole);
-        state.allowed_moves = get_allowed_moves(&state.board, Cell::Black);
+        }
+    }
 
-        state
+    pub fn from_board(board: Board) -> Self {
+        GameState {
+            board,
+            allowed_moves: board.allowed_moves(Cell::Black),
+            best_score: 0,
+        }
     }
 
     pub fn run_minimax(
@@ -59,7 +58,6 @@ impl GameState {
         });
         let (best_move, _) = *best_score.lock().unwrap();
         let best_move = best_move.clone();
-        self.apply_move(&best_move, color);
         i2p(best_move.0)
     }
 
@@ -78,10 +76,11 @@ impl GameState {
         let next_state = self.copy_with_step(player_move, color);
         let (mut alpha, mut beta) = ab;
         let mut best_eval = if is_maxing { Score::MIN } else { Score::MAX };
+        let opposite_color = opposite_color(color);
         if is_maxing {
             for child_move in next_state.allowed_moves.iter() {
                 let eval = next_state.minimax(
-                    color,
+                    opposite_color,
                     child_move,
                     depth - 1,
                     (alpha, beta),
@@ -96,7 +95,7 @@ impl GameState {
         } else {
             for child_move in next_state.allowed_moves.iter() {
                 let eval = next_state.minimax(
-                    color,
+                    opposite_color,
                     child_move,
                     depth - 1,
                     (alpha, beta),
@@ -124,8 +123,8 @@ impl GameState {
         new_state
     }
 
-    fn set_cell(&mut self, pos: Point, cell: Cell) -> &mut Self {
-        self.board[p2i(pos) as usize] = cell;
+    fn set_cell(&mut self, pos: Point, color: Cell) -> &mut Self {
+        self.board.place(pos, color);
         self
     }
 
@@ -142,45 +141,14 @@ impl GameState {
     }
 
     fn apply_move(&mut self, player_move: &PlayerMove, color: Cell) {
-        self.board[player_move.0 as usize] = color;
-        for &i in player_move.1.iter() {
-            self.board[i as usize] = color;
-        }
+        self.board.apply_move(*player_move, color);
     }
 
     fn static_eval(&self, color: Cell) -> Score {
-        self.board.iter().filter(|&cell| *cell == color).count()
+        self.board.0.iter().filter(|&cell| *cell == color).count()
     }
 
     pub fn update_allowed(&mut self, color: Cell) {
-        self.allowed_moves = get_allowed_moves(&self.board, color);
-    }
-}
-
-impl TryFrom<String> for GameState {
-    type Error = String;
-    fn try_from(board_str: String) -> Result<Self, Self::Error> {
-        let mut board = [Cell::Empty; 64];
-        let mut idx = 0;
-        for ch in board_str.chars().filter(|ch| !ch.is_whitespace()) {
-            let cell = match ch {
-                'B' => Some(Cell::Black),
-                'H' => Some(Cell::BlackHole),
-                'W' => Some(Cell::White),
-                '_' => Some(Cell::Empty),
-                _ => None,
-            };
-            if let Some(cell) = cell {
-                board[idx] = cell;
-                idx += 1;
-            } else {
-                return Err(format!("Unexpected char inside board: {}", ch));
-            }
-        }
-        Ok(Self {
-            board,
-            allowed_moves: get_allowed_moves(&board, Cell::Black),
-            best_score: 0,
-        })
+        self.allowed_moves = self.board.allowed_moves(color);
     }
 }

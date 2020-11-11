@@ -1,10 +1,10 @@
+mod board;
 mod bot;
-mod game;
+mod tests;
 mod utils;
 
 use bot::*;
 use clap::{App, AppSettings, Arg};
-use utils::EndState;
 
 fn main() {
     let matches = App::new(env!("CARGO_PKG_NAME"))
@@ -19,7 +19,6 @@ fn main() {
             Arg::with_name("max_depth")
                 .long("depth")
                 .takes_value(true)
-                .default_value("8")
                 .help("Maximum tree depth"),
         )
         .arg(
@@ -42,13 +41,10 @@ fn main() {
 
     let mut bot = Bot::new(&matches);
     bot.run();
-    println!(
-        "{}",
-        match bot.win_state {
-            EndState::Tie => "Tie!",
-            EndState::BlackWon => "Black won!",
-            EndState::WhiteWon => "White won!",
-            _ => "Game hadn't been completed.",
-        }
-    );
+    bot.report();
+
+    // Required to satisfy tester
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
 }
