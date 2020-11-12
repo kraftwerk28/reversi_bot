@@ -1,6 +1,6 @@
 mod board;
 mod bot;
-mod tests;
+mod sev;
 mod utils;
 
 use bot::*;

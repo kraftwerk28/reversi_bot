@@ -1,6 +1,6 @@
 use crate::board::Board;
 use std::{
-    char,
+    char, fmt,
     io::{stdin, stdout, Write},
     process,
 };
@@ -66,6 +66,41 @@ impl Point {
 
     pub fn usize(&self) -> usize {
         self.0 as usize
+    }
+
+    #[allow(dead_code)]
+    pub fn mirror(&self) -> [Self; 4] {
+        let (x, y) = self.to_xy();
+        [
+            Self::from_xy(x, y),
+            Self::from_xy(7 - x, y),
+            Self::from_xy(x, 7 - y),
+            Self::from_xy(7 - x, 7 - y),
+        ]
+    }
+
+    pub fn unmirror4(&self) -> Self {
+        let (x, y) = self.to_xy();
+        Self::from_xy(
+            if x < 4 { x } else { 7 - x },
+            if y < 4 { y } else { 7 - y },
+        )
+    }
+
+    pub fn unmirror8(&self) -> Self {
+        let (x, y) = self.unmirror4().to_xy();
+        if x > y {
+            Self::from_xy(x, y)
+        } else {
+            Self::from_xy(y, x)
+        }
+    }
+}
+
+impl fmt::Debug for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let (x, y) = self.to_xy();
+        write!(f, "(x = {}, y = {})", x, y)
     }
 }
 
@@ -259,4 +294,11 @@ pub fn get_allowed_moves(board: &Board, color: Cell) -> AllowedMoves {
     }
 
     res
+}
+
+#[test]
+fn mirror1() {
+    let p = Point::from_xy(6, 5);
+    assert_eq!(p.unmirror4(), Point::from_xy(1, 2));
+    assert_eq!(p.unmirror8(), Point::from_xy(2, 1));
 }

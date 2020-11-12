@@ -63,7 +63,6 @@ impl std::convert::TryFrom<String> for Board {
         let mut board = [Cell::Empty; 64];
         let mut idx = 0;
         for ch in board_str.chars().filter(|ch| !ch.is_whitespace()) {
-
             let cell = match ch {
                 'B' => Some(Cell::Black),
                 'H' => Some(Cell::BlackHole),
@@ -83,7 +82,13 @@ impl std::convert::TryFrom<String> for Board {
     }
 }
 
-// impl IntoIterator for Board { type Item = Cell; type IntoIter = std::slice::Iter<Self::Item>; }
+// impl IntoIterator for Board {
+//     type Item = &'static Cell;
+//     type IntoIter = std::slice::Iter<'static, Self::Item>;
+//     fn into_iter(self) -> Self::IntoIter {
+//         (&self.0).into_iter()
+//     }
+// }
 
 #[test]
 fn test_board_count() {
@@ -108,4 +113,13 @@ fn test_board_count_move2() {
     let board = board.with_move(allowed_moves.first().unwrap(), Cell::Black);
     assert_eq!(board.count(Cell::White), 1);
     assert_eq!(board.count(Cell::Black), 4);
+}
+
+#[test]
+fn test_board_indexes() {
+    let b = Board::initial(Point::from_xy(1, 1));
+    for (i, c) in b.0.iter().enumerate() {
+        let tile_index = Point::from_idx(i as TileIdx).unmirror8().to_idx();
+        assert!([0, 1, 2, 3, 9, 10, 11, 18, 19, 27].contains(&tile_index));
+    }
 }

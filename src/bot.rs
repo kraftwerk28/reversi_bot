@@ -1,4 +1,4 @@
-use crate::{board::Board, utils::*};
+use crate::{board::Board, sev::*, utils::*};
 use clap::ArgMatches;
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -192,7 +192,7 @@ impl Bot {
         let allowed_moves = board.allowed_moves(color);
 
         if depth <= 0 || allowed_moves.is_empty() {
-            return self.static_eval(board);
+            return static_eval_with_weights_2(&board, self.my_color);
         }
 
         let is_maxing = if self.is_anti {
@@ -220,17 +220,10 @@ impl Bot {
                 beta = min_of(eval, beta);
             }
             if beta <= alpha {
-                // log!(self, "Cutting alphabeta at level {}", depth);
                 break;
             }
         }
         best_eval
-    }
-
-    fn static_eval(&self, board: Board) -> Score {
-        let my_discs = board.count(self.my_color) as Score;
-        let other_discs = board.count(self.my_color.opposite()) as Score;
-        my_discs - other_discs
     }
 
     fn their_move(&mut self) {
