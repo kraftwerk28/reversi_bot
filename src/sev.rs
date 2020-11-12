@@ -94,7 +94,6 @@ fn test_score_1() {
         .place(Point::from_xy(6, 0), Cell::Black);
     assert_eq!(
         static_eval_with_weights_1(&b, Cell::Black),
-        BAD_EDGE + GOOD_CORNER 
+        BAD_EDGE + GOOD_CORNER
     );
 }
-

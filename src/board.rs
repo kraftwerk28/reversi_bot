@@ -118,7 +118,7 @@ fn test_board_count_move2() {
 #[test]
 fn test_board_indexes() {
     let b = Board::initial(Point::from_xy(1, 1));
-    for (i, c) in b.0.iter().enumerate() {
+    for (i, _) in b.0.iter().enumerate() {
         let tile_index = Point::from_idx(i as TileIdx).unmirror8().to_idx();
         assert!([0, 1, 2, 3, 9, 10, 11, 18, 19, 27].contains(&tile_index));
     }
