@@ -1,9 +1,29 @@
-use crate::board::Board;
+use crate::{board::Board, point::Point};
+use clap::{App, AppSettings, Arg, ArgMatches};
 use std::{
-    char, fmt,
+    cell::RefCell,
+    convert::TryFrom,
+    fs::{File, OpenOptions},
     io::{stdin, stdout, Write},
     process,
+    sync::Mutex,
 };
+
+// A small logging util
+macro_rules! log {
+    ($slf:ident, $($fmtargs:expr),+ $(,)*) => {
+        if let Some(log_file) = &$slf.log_file {
+            let lck = log_file.lock().unwrap();
+            let mut writable = lck.borrow_mut();
+            writeln!(writable, $($fmtargs),+).unwrap();
+        }
+    }
+}
+
+pub trait Bot {
+    fn run(&mut self);
+    fn report(&self);
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Cell {
@@ -21,86 +41,18 @@ impl Cell {
             _ => panic!("Unexpected color"),
         }
     }
-}
-
-#[derive(Copy, Clone, PartialEq)]
-pub struct Point(TileIdx);
-
-impl Point {
-    pub fn from_ab(ab: &str) -> Option<Self> {
-        let mut chars = ab.chars();
-        let x = chars.next().unwrap() as TileIdx;
-        let y = chars.next().and_then(|c| c.to_digit(10)).unwrap() as TileIdx;
-        if (1..=8).contains(&y) && (65..=72).contains(&x) {
-            Some(Self::from_xy(x - 65, y - 1))
-        } else {
-            None
-        }
-    }
-
-    pub fn to_ab(&self) -> String {
-        let (x, y) = self.to_xy();
-        format!(
-            "{}{}",
-            char::from_u32(x as u32 + 65).unwrap(),
-            (y + 1).to_string()
-        )
-    }
-
-    pub fn from_idx(idx: TileIdx) -> Self {
-        Self(idx)
-    }
-
-    #[allow(dead_code)]
-    pub fn to_idx(&self) -> TileIdx {
-        self.0
-    }
-
-    pub fn from_xy(x: TileIdx, y: TileIdx) -> Self {
-        Self(y * 8 + x)
-    }
-
-    pub fn to_xy(&self) -> (TileIdx, TileIdx) {
-        (self.0 % 8, self.0 / 8)
-    }
-
-    pub fn usize(&self) -> usize {
-        self.0 as usize
-    }
-
-    #[allow(dead_code)]
-    pub fn mirror(&self) -> [Self; 4] {
-        let (x, y) = self.to_xy();
-        [
-            Self::from_xy(x, y),
-            Self::from_xy(7 - x, y),
-            Self::from_xy(x, 7 - y),
-            Self::from_xy(7 - x, 7 - y),
-        ]
-    }
-
-    pub fn unmirror4(&self) -> Self {
-        let (x, y) = self.to_xy();
-        Self::from_xy(
-            if x < 4 { x } else { 7 - x },
-            if y < 4 { y } else { 7 - y },
-        )
-    }
-
-    pub fn unmirror8(&self) -> Self {
-        let (x, y) = self.unmirror4().to_xy();
-        if x > y {
-            Self::from_xy(x, y)
-        } else {
-            Self::from_xy(y, x)
+    pub fn is_disc(&self) -> bool {
+        match self {
+            Cell::White | Cell::Black => true,
+            _ => false,
         }
     }
 }
 
-impl fmt::Debug for Point {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let (x, y) = self.to_xy();
-        write!(f, "(x = {}, y = {})", x, y)
+impl std::ops::Not for Cell {
+    type Output = Self;
+    fn not(self) -> Self {
+        self.opposite()
     }
 }
 
@@ -111,7 +63,23 @@ pub enum EndState {
     WhiteWon,
     BlackWon,
     Tie,
-    OnePass,
+}
+
+impl EndState {
+    pub fn is_over(&self) -> bool {
+        match self {
+            EndState::Unknown => false,
+            _ => true,
+        }
+    }
+
+    pub fn won(&self, cell: Cell) -> bool {
+        match self {
+            EndState::WhiteWon => cell == Cell::White,
+            EndState::BlackWon => cell == Cell::Black,
+            _ => false,
+        }
+    }
 }
 
 pub enum CLIMove {
@@ -296,9 +264,154 @@ pub fn get_allowed_moves(board: &Board, color: Cell) -> AllowedMoves {
     res
 }
 
+pub fn parse_args() -> ArgMatches<'static> {
+    App::new(env!("CARGO_PKG_NAME"))
+        .setting(AppSettings::DisableVersion)
+        .arg(
+            Arg::with_name("version")
+                .short("v")
+                .long("version")
+                .help("Show version"),
+        )
+        .arg(
+            Arg::with_name("max_depth")
+                .long("depth")
+                .takes_value(true)
+                .help("Maximum tree depth"),
+        )
+        .arg(
+            Arg::with_name("log_file")
+                .long("log")
+                .takes_value(true)
+                .help("File for logging"),
+        )
+        .arg(
+            Arg::with_name("no_anti")
+                .long("no-anti")
+                .help("Play regular reversi"),
+        )
+        .arg(
+            Arg::with_name("time_limit")
+                .long("time-limit")
+                .short("t")
+                .takes_value(true)
+                .help("Set time limit in milliseconds (for MCTS)"),
+        )
+        .get_matches()
+}
+
+pub type LogFile = Option<Mutex<RefCell<File>>>;
+pub fn get_logfile(matches: &ArgMatches) -> LogFile {
+    matches
+        .value_of("log_file")
+        .map(|s| s.to_string())
+        .or(std::env::var("LOG").ok())
+        .map(|name| {
+            OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open(name)
+                .map(|f| Mutex::new(RefCell::new(f)))
+                .unwrap()
+        })
+}
+
+pub fn get_tree_depth(matches: &ArgMatches) -> usize {
+    matches
+        .value_of("max_depth")
+        .map(str::to_string)
+        .or(std::env::var("TREE").ok())
+        .map(|s| s.parse::<usize>().unwrap())
+        .unwrap_or(4)
+}
+
+pub fn wincheck(
+    board: &Board,
+    allowed_moves: &AllowedMoves,
+    is_anti: bool,
+    color: Cell,
+) -> EndState {
+    if allowed_moves.len() > 0 {
+        return EndState::Unknown;
+    }
+    let maybepassmoves = board.allowed_moves(color.opposite());
+    if maybepassmoves.len() > 0 {
+        return EndState::Unknown;
+    }
+
+    let mut nblack = 0;
+    let mut nwhite = 0;
+    for disc in board.0.iter() {
+        match disc {
+            Cell::White => nwhite += 1,
+            Cell::Black => nblack += 1,
+            _ => {}
+        };
+    }
+
+    if nblack > nwhite {
+        if is_anti {
+            EndState::WhiteWon
+        } else {
+            EndState::BlackWon
+        }
+    } else if nblack < nwhite {
+        if is_anti {
+            EndState::BlackWon
+        } else {
+            EndState::WhiteWon
+        }
+    } else {
+        EndState::Tie
+    }
+}
+
 #[test]
-fn mirror1() {
-    let p = Point::from_xy(6, 5);
-    assert_eq!(p.unmirror4(), Point::from_xy(1, 2));
-    assert_eq!(p.unmirror8(), Point::from_xy(2, 1));
+fn wincheck_1() {
+    let s = "BBBBBBBB
+             BBBBBBBB
+             BBBBBBBB
+             BBBBBBBB
+             BBBBBBBB
+             BBBBBBBB
+             BBBBBBBB
+             BBBBBBBB";
+    let b = Board::try_from(s.to_string()).unwrap();
+    assert_eq!(
+        wincheck(&b, &b.allowed_moves(Cell::White), true, Cell::Black),
+        EndState::WhiteWon
+    );
+}
+
+#[test]
+fn wincheck_2() {
+    let s = "BBBBBBBB
+             BBBBBBBB
+             BBBBB___
+             BBBBB__W
+             BBBBBB__
+             BBBBBB__
+             BBBBBBBB
+             BBBBBBBB";
+    let b = Board::try_from(s.to_string()).unwrap();
+    let win = wincheck(&b, &b.allowed_moves(Cell::White), true, Cell::Black);
+    assert!(win.is_over());
+    assert_eq!(win, EndState::WhiteWon);
+}
+
+#[test]
+fn wincheck_3() {
+    let s = "BBBBBBBB
+             BBBBBBBB
+             BBBBBBBB
+             BBBBBBBB
+             WWWWWWWW
+             WWWWWWWW
+             WWWWWWWW
+             WWWWWWWW";
+    let b = Board::try_from(s.to_string()).unwrap();
+    let win = wincheck(&b, &b.allowed_moves(Cell::White), true, Cell::Black);
+    assert!(win.is_over());
+    assert_eq!(win, EndState::Tie);
 }

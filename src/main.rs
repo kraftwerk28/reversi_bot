@@ -1,50 +1,33 @@
-mod board;
-mod bot;
-mod sev;
+#[macro_use]
 mod utils;
+mod board;
+mod mcts;
+mod minimax;
+mod point;
+mod sev;
 
-use bot::*;
-use clap::{App, AppSettings, Arg};
+use mcts::MCTSBot;
+use minimax::MinimaxBot;
+use std::{thread, time};
+use utils::{parse_args, Bot};
 
 fn main() {
-    let matches = App::new(env!("CARGO_PKG_NAME"))
-        .setting(AppSettings::DisableVersion)
-        .arg(
-            Arg::with_name("version")
-                .short("v")
-                .long("version")
-                .help("Show version"),
-        )
-        .arg(
-            Arg::with_name("max_depth")
-                .long("depth")
-                .takes_value(true)
-                .help("Maximum tree depth"),
-        )
-        .arg(
-            Arg::with_name("log_file")
-                .long("log")
-                .takes_value(true)
-                .help("File for logging"),
-        )
-        .arg(
-            Arg::with_name("no-anti")
-                .long("no-anti")
-                .help("Play regular reversi"),
-        )
-        .get_matches();
+    let matches = parse_args();
 
+    // Get current verstion (only for CI)
     if matches.is_present("version") {
         println!(env!("CARGO_PKG_VERSION"));
         return;
     }
 
-    let mut bot = Bot::new(&matches);
+    // let mut bot = MinimaxBot::new(&matches);
+    let mut bot = MCTSBot::new(&matches);
     bot.run();
     bot.report();
 
     // Required to satisfy tester
+    // But the tester still doesn't kill the process :(
     loop {
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        thread::sleep(time::Duration::from_millis(100));
     }
 }

@@ -1,4 +1,5 @@
-use crate::utils::*;
+use crate::{point::Point, utils::*};
+use rand::{rngs::ThreadRng, Rng};
 use std::fmt;
 
 #[derive(Copy, Clone)]
@@ -48,6 +49,31 @@ impl Board {
         result.apply_move(player_move, color);
         result
     }
+
+    pub fn sim(
+        board: &Board,
+        player_move: PlayerMove,
+        color: Cell,
+        is_anti: bool,
+        mut rng: ThreadRng,
+    ) -> EndState {
+        let new_board = board.with_move(&player_move, color);
+
+        let new_color = color.opposite();
+        let allowed = board.allowed_moves(new_color);
+        let win = wincheck(board, &allowed, is_anti, new_color);
+
+        if win.is_over() {
+            win
+        } else if allowed.len() > 0 {
+            let mv = allowed[rng.gen_range(0, allowed.len())].clone();
+            Board::sim(&new_board, mv, new_color, is_anti, rng)
+        } else {
+            let allowed = board.allowed_moves(color);
+            let mv = allowed[rng.gen_range(0, allowed.len())].clone();
+            Board::sim(&new_board, mv, color, is_anti, rng)
+        }
+    }
 }
 
 impl fmt::Debug for Board {
@@ -78,6 +104,7 @@ impl std::convert::TryFrom<String> for Board {
                 return Err(format!("Unexpected char inside board: {}", ch));
             }
         }
+        // let disccount = board.iter().filter(|d| d.is_disc()).count()
         Ok(Self(board))
     }
 }
