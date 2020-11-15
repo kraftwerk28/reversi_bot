@@ -2,12 +2,11 @@
 mod utils;
 mod board;
 mod mcts;
+mod mcts2;
 mod minimax;
 mod point;
 mod sev;
 
-use mcts::MCTSBot;
-use minimax::MinimaxBot;
 use std::{thread, time};
 use utils::{parse_args, Bot};
 
@@ -20,8 +19,7 @@ fn main() {
         return;
     }
 
-    // let mut bot = MinimaxBot::new(&matches);
-    let mut bot = MCTSBot::new(&matches);
+    let mut bot = mcts::MCTSBot::new(&matches);
     bot.run();
     bot.report();
 

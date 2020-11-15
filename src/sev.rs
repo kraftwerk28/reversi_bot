@@ -30,7 +30,7 @@ fn tile_cost_1(pos: Point) -> Score {
 }
 
 #[inline]
-fn tile_cost_2(pos: Point) -> Score {
+pub fn tile_cost_2(pos: Point) -> Score {
     let i = pos.unmirror8().to_idx();
     match i {
         0 => 99,

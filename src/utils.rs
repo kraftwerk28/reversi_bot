@@ -4,7 +4,7 @@ use std::{
     cell::RefCell,
     convert::TryFrom,
     fs::{File, OpenOptions},
-    io::{stdin, stdout, Write},
+    io::{stdin, stdout, BufWriter, Write},
     process,
     sync::Mutex,
 };
@@ -221,6 +221,7 @@ pub fn min_of(s1: Score, s2: Score) -> Score {
     }
 }
 
+#[inline]
 pub fn get_allowed_moves(board: &Board, color: Cell) -> AllowedMoves {
     let mut res: AllowedMoves = Vec::new();
     let rev_color = color.opposite();
@@ -300,7 +301,7 @@ pub fn parse_args() -> ArgMatches<'static> {
         .get_matches()
 }
 
-pub type LogFile = Option<Mutex<RefCell<File>>>;
+pub type LogFile = Option<Mutex<RefCell<BufWriter<File>>>>;
 pub fn get_logfile(matches: &ArgMatches) -> LogFile {
     matches
         .value_of("log_file")
@@ -312,7 +313,7 @@ pub fn get_logfile(matches: &ArgMatches) -> LogFile {
                 .truncate(true)
                 .write(true)
                 .open(name)
-                .map(|f| Mutex::new(RefCell::new(f)))
+                .map(|f| Mutex::new(RefCell::new(BufWriter::new(f))))
                 .unwrap()
         })
 }
@@ -326,6 +327,7 @@ pub fn get_tree_depth(matches: &ArgMatches) -> usize {
         .unwrap_or(4)
 }
 
+#[inline]
 pub fn wincheck(
     board: &Board,
     allowed_moves: &AllowedMoves,
@@ -414,4 +416,9 @@ fn wincheck_3() {
     let win = wincheck(&b, &b.allowed_moves(Cell::White), true, Cell::Black);
     assert!(win.is_over());
     assert_eq!(win, EndState::Tie);
+}
+
+pub fn uct_score(parent_nvisits: u64, nwins: u64, nvisits: u64) -> f64 {
+    (nwins as f64 / nvisits as f64)
+        + 2f64.sqrt() * ((parent_nvisits as f64).ln() / nvisits as f64).sqrt()
 }

@@ -1,5 +1,5 @@
-use crate::{point::Point, utils::*};
-use rand::{rngs::ThreadRng, Rng};
+use crate::{point::Point, sev::*, utils::*};
+use rand::{distributions::WeightedIndex, prelude::*, rngs::ThreadRng, Rng};
 use std::fmt;
 
 #[derive(Copy, Clone)]
@@ -20,6 +20,7 @@ impl Board {
         self
     }
 
+    #[inline]
     pub fn apply_move(
         &mut self,
         player_move: &PlayerMove,
@@ -32,6 +33,7 @@ impl Board {
         self
     }
 
+    #[inline]
     pub fn allowed_moves(&self, color: Cell) -> AllowedMoves {
         get_allowed_moves(&self, color)
     }
@@ -44,34 +46,58 @@ impl Board {
         self.0.iter().filter(|&&c| c == color).count()
     }
 
+    #[inline]
     pub fn with_move(&self, player_move: &PlayerMove, color: Cell) -> Self {
         let mut result = self.clone();
         result.apply_move(player_move, color);
         result
     }
 
+    #[inline]
     pub fn sim(
         board: &Board,
         player_move: PlayerMove,
-        color: Cell,
+        mut color: Cell,
         is_anti: bool,
         mut rng: ThreadRng,
     ) -> EndState {
-        let new_board = board.with_move(&player_move, color);
-
-        let new_color = color.opposite();
-        let allowed = board.allowed_moves(new_color);
-        let win = wincheck(board, &allowed, is_anti, new_color);
-
-        if win.is_over() {
-            win
-        } else if allowed.len() > 0 {
+        let mut new_board = board.with_move(&player_move, color);
+        loop {
+            color = color.opposite();
+            let mut allowed = new_board.allowed_moves(color);
+            let win = wincheck(&new_board, &allowed, is_anti, color);
+            if win.is_over() {
+                return win;
+            }
+            if allowed.len() == 0 {
+                color = color.opposite();
+                allowed = new_board.allowed_moves(color);
+            }
             let mv = allowed[rng.gen_range(0, allowed.len())].clone();
-            Board::sim(&new_board, mv, new_color, is_anti, rng)
-        } else {
-            let allowed = board.allowed_moves(color);
+            new_board.apply_move(&mv, color);
+        }
+    }
+
+    #[inline]
+    pub fn simauto(
+        mut board: Board,
+        mut color: Cell,
+        is_anti: bool,
+    ) -> EndState {
+        let mut rng = thread_rng();
+        loop {
+            let mut allowed = board.allowed_moves(color);
+            let win = wincheck(&board, &allowed, is_anti, color);
+            if win.is_over() {
+                return win;
+            }
+            if allowed.len() == 0 {
+                color = color.opposite();
+                allowed = board.allowed_moves(color);
+            }
             let mv = allowed[rng.gen_range(0, allowed.len())].clone();
-            Board::sim(&new_board, mv, color, is_anti, rng)
+            board.apply_move(&mv, color);
+            color = color.opposite();
         }
     }
 }

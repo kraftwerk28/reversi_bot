@@ -2,8 +2,6 @@ use crate::{board::Board, sev::*, utils::*};
 use clap::ArgMatches;
 use rayon::prelude::*;
 use std::{
-    cell::RefCell,
-    fs::File,
     io::Write,
     sync::Mutex,
     time::{Duration, Instant},
@@ -16,7 +14,7 @@ pub struct MinimaxBot {
     win_state: EndState,
     allowed_moves: AllowedMoves,
     max_tree_depth: usize,
-    log_file: Option<Mutex<RefCell<File>>>,
+    log_file: LogFile,
     is_anti: bool,
     total_timer: Duration,
 }
@@ -138,6 +136,10 @@ impl Bot for MinimaxBot {
                 _ => "Game hadn't been completed.",
             }
         );
+        if let Some(logfile) = &self.log_file {
+            let lck = logfile.lock().unwrap();
+            lck.borrow_mut().flush().unwrap();
+        }
     }
 
     fn run(&mut self) {
