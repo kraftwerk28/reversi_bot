@@ -1,4 +1,4 @@
-use crate::{point::Point, sev::*, utils::*};
+use crate::{point::Point, utils::*};
 use rand::{distributions::WeightedIndex, prelude::*, rngs::ThreadRng, Rng};
 use std::fmt;
 

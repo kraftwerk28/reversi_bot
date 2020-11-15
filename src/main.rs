@@ -8,7 +8,7 @@ mod point;
 mod sev;
 
 use std::{thread, time};
-use utils::{parse_args, Bot};
+use utils::{parse_args, select_bot_impl};
 
 fn main() {
     let matches = parse_args();
@@ -19,7 +19,7 @@ fn main() {
         return;
     }
 
-    let mut bot = mcts::MCTSBot::new(&matches);
+    let mut bot = select_bot_impl(&matches);
     bot.run();
     bot.report();
 

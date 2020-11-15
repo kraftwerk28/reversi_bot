@@ -24,15 +24,15 @@ impl MinimaxBot {
         let black_hole = Chan::read().coord();
         let my_color = Chan::read().color();
 
-        let is_anti = !arg_matches.is_present("no_anti")
-            && !std::env::var("NO_ANTI")
-                .map(|it| it == "1")
-                .unwrap_or(false);
+        let is_anti = !arg_matches.is_present("no_anti");
 
         let board = Board::initial(black_hole);
         let current_color = Cell::Black;
         let allowed_moves = board.allowed_moves(current_color);
-        let max_tree_depth = get_tree_depth(&arg_matches);
+        let max_tree_depth = arg_matches
+            .value_of("max_depth")
+            .map(|s| s.parse::<usize>().unwrap())
+            .unwrap();
 
         let bot = Self {
             board,
@@ -46,6 +46,7 @@ impl MinimaxBot {
             total_timer: Duration::default(),
         };
 
+        log!(bot, "alg: MiniMax");
         log!(bot, "black hole: {:?}", black_hole.to_ab());
         log!(bot, "my color: {:?}", my_color);
         log!(bot, "anti reversi mode: {}", is_anti);

@@ -25,10 +25,7 @@ impl MCTSBot {
         let black_hole = Chan::read().coord();
         let my_color = Chan::read().color();
 
-        let is_anti = !arg_matches.is_present("no_anti")
-            && !std::env::var("NO_ANTI")
-                .map(|it| it == "1")
-                .unwrap_or(false);
+        let is_anti = !arg_matches.is_present("no_anti");
 
         let board = Board::initial(black_hole);
         let current_color = Cell::Black;
@@ -36,10 +33,8 @@ impl MCTSBot {
 
         let move_maxtime = arg_matches
             .value_of("time_limit")
-            .map(str::to_string)
-            .or(std::env::var("MAX_TIME").ok())
             .map(|it| it.parse::<u64>().unwrap())
-            .unwrap_or(4000);
+            .unwrap();
 
         let bot = Self {
             board,
@@ -53,6 +48,7 @@ impl MCTSBot {
             move_maxtime: Duration::from_millis(move_maxtime),
         };
 
+        log!(bot, "alg: Basic MCTS");
         log!(bot, "black hole: {:?}", black_hole.to_ab());
         log!(bot, "my color: {:?}", my_color);
         log!(bot, "anti reversi mode: {}", is_anti);

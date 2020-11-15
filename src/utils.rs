@@ -276,19 +276,23 @@ pub fn parse_args() -> ArgMatches<'static> {
         )
         .arg(
             Arg::with_name("max_depth")
-                .long("depth")
+                .long("max-depth")
                 .takes_value(true)
-                .help("Maximum tree depth"),
+                .default_value("4")
+                .env("MAX_DEPTH")
+                .help("Maximum tree depth (only for minimax)"),
         )
         .arg(
             Arg::with_name("log_file")
                 .long("log")
+                .env("LOG")
                 .takes_value(true)
                 .help("File for logging"),
         )
         .arg(
             Arg::with_name("no_anti")
                 .long("no-anti")
+                .env("NO_ANTI")
                 .help("Play regular reversi"),
         )
         .arg(
@@ -296,35 +300,32 @@ pub fn parse_args() -> ArgMatches<'static> {
                 .long("time-limit")
                 .short("t")
                 .takes_value(true)
+                .env("MAX_TIME")
+                .default_value("4000")
                 .help("Set time limit in milliseconds (for MCTS)"),
+        )
+        .arg(
+            Arg::with_name("bot_impl")
+                .long("bot-impl")
+                .takes_value(true)
+                .possible_values(&["minimax", "mcts_basic", "mcts"])
+                .env("BOT_IMPL")
+                .default_value("mcts"),
         )
         .get_matches()
 }
 
 pub type LogFile = Option<Mutex<RefCell<BufWriter<File>>>>;
 pub fn get_logfile(matches: &ArgMatches) -> LogFile {
-    matches
-        .value_of("log_file")
-        .map(|s| s.to_string())
-        .or(std::env::var("LOG").ok())
-        .map(|name| {
-            OpenOptions::new()
-                .create(true)
-                .truncate(true)
-                .write(true)
-                .open(name)
-                .map(|f| Mutex::new(RefCell::new(BufWriter::new(f))))
-                .unwrap()
-        })
-}
-
-pub fn get_tree_depth(matches: &ArgMatches) -> usize {
-    matches
-        .value_of("max_depth")
-        .map(str::to_string)
-        .or(std::env::var("TREE").ok())
-        .map(|s| s.parse::<usize>().unwrap())
-        .unwrap_or(4)
+    matches.value_of("log_file").map(|name| {
+        OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(name)
+            .map(|f| Mutex::new(RefCell::new(BufWriter::new(f))))
+            .unwrap()
+    })
 }
 
 #[inline]
@@ -366,6 +367,26 @@ pub fn wincheck(
         }
     } else {
         EndState::Tie
+    }
+}
+
+pub fn uct_score(parent_nvisits: u64, nwins: u64, nvisits: u64) -> f64 {
+    if nvisits == 0 {
+        f64::MAX
+    } else {
+        (nwins as f64 / nvisits as f64)
+            + 2f64.sqrt()
+                * ((parent_nvisits as f64).ln() / nvisits as f64).sqrt()
+    }
+}
+
+pub fn select_bot_impl(matches: &ArgMatches) -> Box<dyn Bot> {
+    use crate::{mcts, mcts2, minimax};
+    match matches.value_of("bot_impl").unwrap() {
+        "minimax" => Box::new(minimax::MinimaxBot::new(matches)),
+        "mcts_basic" => Box::new(mcts::MCTSBot::new(matches)),
+        "mcts" => Box::new(mcts2::MCTSBot::new(matches)),
+        _ => unreachable!(),
     }
 }
 
@@ -416,9 +437,4 @@ fn wincheck_3() {
     let win = wincheck(&b, &b.allowed_moves(Cell::White), true, Cell::Black);
     assert!(win.is_over());
     assert_eq!(win, EndState::Tie);
-}
-
-pub fn uct_score(parent_nvisits: u64, nwins: u64, nvisits: u64) -> f64 {
-    (nwins as f64 / nvisits as f64)
-        + 2f64.sqrt() * ((parent_nvisits as f64).ln() / nvisits as f64).sqrt()
 }

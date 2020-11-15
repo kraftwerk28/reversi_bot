@@ -1,12 +1,11 @@
 use crate::{board::Board, utils::*};
-use crossbeam::channel::{select, unbounded};
-use rand::thread_rng;
+use crossbeam::channel::unbounded;
+use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 use std::{
     cell::RefCell,
-    collections::HashMap,
     io::Write,
-    rc::Rc,
+    rc::{Rc, Weak},
     thread,
     time::{Duration, Instant},
 };
@@ -28,15 +27,20 @@ struct Node {
     nwins: u64,
     nvisits: u64,
     children: Vec<NodeRef>,
-    parent: Option<NodeRef>,
+    parent: Option<WeakNodeRef>,
     player_move: Option<PlayerMove>,
     leaf: bool,
 }
 
 type NodeRef = Rc<RefCell<Node>>;
+type WeakNodeRef = Weak<RefCell<Node>>;
 
 impl Node {
-    fn new(board: Board, color: Cell) -> NodeRef {
+    fn new(
+        board: Board,
+        color: Cell,
+        player_move: Option<PlayerMove>,
+    ) -> NodeRef {
         let node = Node {
             board,
             color,
@@ -44,7 +48,7 @@ impl Node {
             nvisits: 0,
             children: Vec::new(),
             parent: None,
-            player_move: None,
+            player_move,
             leaf: false,
         };
         Rc::new(RefCell::new(node))
@@ -61,36 +65,44 @@ impl Node {
             for ch in node.borrow().children.iter() {
                 let child = ch.borrow();
                 let score = uct_score(nvisits, child.nwins, child.nvisits);
-                println!("sc:{}", score);
                 if score > max_score {
                     max_score = score;
                     noderef = ch.clone();
-                    println!("sw");
                 }
             }
         }
         noderef
     }
 
-    fn expansion(noderef: NodeRef) -> NodeRef {
-        let mut node = noderef.borrow_mut();
-        assert_eq!(node.children.len(), 0);
-        let allowed = node.board.allowed_moves(node.color);
-        if allowed.len() > 0 {
-            for player_move in allowed {
-                let child_node = Node {
-                    color: node.color.opposite(),
-                    board: node.board.with_move(&player_move, node.color),
-                    parent: Some(noderef.clone()),
-                    nwins: 0,
-                    nvisits: 0,
-                    children: vec![],
-                    player_move: Some(player_move),
-                    leaf: false,
-                };
-                node.children.push(Rc::new(RefCell::new(child_node)));
-            }
+    fn expansion(mut noderef: NodeRef) -> NodeRef {
+        let mut rng = thread_rng();
+        let allowed = {
+            let node = noderef.borrow();
+            assert_eq!(node.children.len(), 0);
+            node.board.allowed_moves(node.color)
+        };
+
+        if !allowed.is_empty() {
+            let child = {
+                let mut node = noderef.borrow_mut();
+                for player_move in allowed.iter() {
+                    let child_node = Node {
+                        color: node.color.opposite(),
+                        board: node.board.with_move(&player_move, node.color),
+                        parent: Some(Rc::downgrade(&noderef)),
+                        nwins: 0,
+                        nvisits: 0,
+                        children: vec![],
+                        player_move: Some(player_move.clone()),
+                        leaf: false,
+                    };
+                    node.children.push(Rc::new(RefCell::new(child_node)));
+                }
+                node.children[rng.gen_range(0, allowed.len())].clone()
+            };
+            noderef = child;
         } else {
+            let mut node = noderef.borrow_mut();
             node.leaf = true;
         }
         noderef.clone()
@@ -101,12 +113,13 @@ impl Node {
             {
                 let mut node = noderef.borrow_mut();
                 node.nvisits += 1;
-                if winresult.won(node.color) {
+                if winresult.won(node.color.opposite()) {
                     node.nwins += 1;
                 }
             }
-            if let Some(parent) = noderef.clone().borrow().parent.clone() {
-                noderef = parent;
+            let node = noderef.clone();
+            if let Some(parent) = &node.borrow().parent {
+                noderef = parent.upgrade().unwrap();
             } else {
                 break;
             };
@@ -130,6 +143,29 @@ impl Node {
         }
         best_node
     }
+
+    fn repr_node(nr: &NodeRef, indent: usize) -> String {
+        let n = nr.borrow();
+        let indstr = " ".repeat(indent * 2);
+        let nv = n
+            .children
+            .iter()
+            .map(|n| Node::repr_node(n, indent + 1))
+            .collect::<Vec<_>>()
+            .join(",\n");
+        format!(
+            "{}Node({}/{}; [\n{}\n{}])",
+            indstr, n.nwins, n.nvisits, nv, indstr
+        )
+    }
+
+    fn score(&self) -> f64 {
+        if self.nvisits == 0 {
+            f64::MIN
+        } else {
+            self.nwins as f64 / self.nvisits as f64
+        }
+    }
 }
 
 impl MCTSBot {
@@ -137,10 +173,7 @@ impl MCTSBot {
         let black_hole = Chan::read().coord();
         let my_color = Chan::read().color();
 
-        let is_anti = !arg_matches.is_present("no_anti")
-            && !std::env::var("NO_ANTI")
-                .map(|it| it == "1")
-                .unwrap_or(false);
+        let is_anti = !arg_matches.is_present("no_anti");
 
         let board = Board::initial(black_hole);
         let current_color = Cell::Black;
@@ -148,10 +181,8 @@ impl MCTSBot {
 
         let move_maxtime = arg_matches
             .value_of("time_limit")
-            .map(str::to_string)
-            .or(std::env::var("MAX_TIME").ok())
             .map(|it| it.parse::<u64>().unwrap())
-            .unwrap_or(300);
+            .unwrap();
 
         let bot = Self {
             board,
@@ -165,6 +196,7 @@ impl MCTSBot {
             move_maxtime: Duration::from_millis(move_maxtime),
         };
 
+        log!(bot, "alg: Advanced MCTS");
         log!(bot, "black hole: {:?}", black_hole.to_ab());
         log!(bot, "my color: {:?}", my_color);
         log!(bot, "anti reversi mode: {}", is_anti);
@@ -174,19 +206,87 @@ impl MCTSBot {
     }
 
     fn mcts(&self) -> PlayerMove {
-        let tree = Node::new(self.board, self.my_color);
-        let timer = Instant::now();
+        let allowed_moves = self.board.allowed_moves(self.my_color);
+        let (stop_tx, stop_rx) = unbounded::<()>();
 
-        while timer.elapsed() < self.move_maxtime {
-            let n = Node::selection(tree.clone());
-            println!("s");
-            let expanded = Node::expansion(n);
-            let win = expanded.borrow().simulate(self.is_anti);
-            Node::back_propagate(expanded, win);
-            println!("p");
+        let tim_thread = thread::spawn({
+            let max_time = self.move_maxtime;
+            let stop_signals_count = allowed_moves.len();
+            move || {
+                let timer = Instant::now();
+                while timer.elapsed() < max_time {}
+                for _ in 0..stop_signals_count {
+                    stop_tx.send(()).unwrap();
+                }
+            }
+        });
+
+        let scores = allowed_moves
+            .par_iter()
+            .map(|pl_move| {
+                let new_board = self.board.with_move(pl_move, self.my_color);
+                let tree = Node::new(
+                    new_board,
+                    self.my_color.opposite(),
+                    Some(pl_move.clone()),
+                );
+                loop {
+                    let selected = Node::selection(tree.clone());
+                    let expanded = Node::expansion(selected);
+                    let rollout_result =
+                        expanded.borrow().simulate(self.is_anti);
+                    Node::back_propagate(expanded, rollout_result);
+                    if let Ok(_) = stop_rx.try_recv() {
+                        break;
+                    }
+                }
+                let node = tree.borrow();
+                (node.score(), node.player_move.clone().unwrap())
+            })
+            .collect::<Vec<_>>();
+
+        tim_thread.join().unwrap();
+
+        // let tree = Node::new(self.board, self.my_color);
+        // let timer = Instant::now();
+        // let mut nhits = 0;
+
+        // while timer.elapsed() < self.move_maxtime {
+        //     nhits += 1;
+        //     let n = Node::selection(tree.clone());
+        //     let expanded = Node::expansion(n);
+        //     let win = expanded.borrow().simulate(self.is_anti);
+        //     Node::back_propagate(expanded, win);
+        // }
+
+        // let tree = tree.borrow();
+
+        // log!(self, "total hits: {}", nhits);
+        // log!(
+        //     self,
+        //     "final scores: [{}]",
+        //     tree.children
+        //         .iter()
+        //         .map(|n| {
+        //             let n = n.borrow();
+        //             format!("{}/{}", n.nwins, n.nvisits)
+        //         })
+        //         .collect::<Vec<_>>()
+        //         .join(", ")
+        // );
+
+        // let best_node = tree.best_child().clone();
+        // let pl_move = best_node.borrow().player_move.clone().unwrap();
+        // pl_move
+        let mut max_score = f64::MIN;
+        let mut best_move = &scores[0].1;
+        for (score, player_move) in scores.iter() {
+            if *score > max_score {
+                max_score = *score;
+                best_move = &player_move
+            }
         }
-        let best_node = tree.borrow().best_child();
-        best_node.clone().borrow().player_move.clone().unwrap()
+        best_move.clone()
     }
 }
 
