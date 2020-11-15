@@ -58,6 +58,9 @@ impl MCTSBot {
     }
 
     fn mcts(&self) -> PlayerMove {
+        if self.allowed_moves.len() == 1 {
+            return self.allowed_moves.first().unwrap().clone();
+        }
         let (results_tx, results_rx) = unbounded::<(EndState, usize)>();
         let (stop_tx, stop_rx) = unbounded::<()>();
 

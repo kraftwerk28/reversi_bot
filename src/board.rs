@@ -87,11 +87,16 @@ impl Board {
         let mut rng = thread_rng();
         loop {
             let mut allowed = board.allowed_moves(color);
+            if allowed.len() == 1 {
+                board.apply_move(&allowed.first().unwrap(), color);
+                color = color.opposite();
+                continue;
+            }
             let win = wincheck(&board, &allowed, is_anti, color);
             if win.is_over() {
                 return win;
             }
-            if allowed.len() == 0 {
+            if allowed.is_empty() {
                 color = color.opposite();
                 allowed = board.allowed_moves(color);
             }

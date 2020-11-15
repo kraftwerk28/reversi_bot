@@ -312,6 +312,12 @@ pub fn parse_args() -> ArgMatches<'static> {
                 .env("BOT_IMPL")
                 .default_value("mcts"),
         )
+        .arg(
+            Arg::with_name("exploitation_value")
+                .long("mcts-exp")
+                .takes_value(true)
+                .env("EXP"),
+        )
         .get_matches()
 }
 
@@ -370,13 +376,12 @@ pub fn wincheck(
     }
 }
 
-pub fn uct_score(parent_nvisits: u64, nwins: u64, nvisits: u64) -> f64 {
+pub fn uct_score(parent_nvisits: u64, nwins: u64, nvisits: u64, c: f64) -> f64 {
     if nvisits == 0 {
         f64::MAX
     } else {
-        (nwins as f64 / nvisits as f64)
-            + 2f64.sqrt()
-                * ((parent_nvisits as f64).ln() / nvisits as f64).sqrt()
+        let xi = nwins as f64 / nvisits as f64;
+        xi + c * ((parent_nvisits as f64).ln() / nvisits as f64).sqrt()
     }
 }
 
