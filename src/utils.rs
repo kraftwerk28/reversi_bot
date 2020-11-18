@@ -2,7 +2,6 @@ use crate::{board::Board, point::Point};
 use clap::{App, AppSettings, Arg, ArgMatches};
 use std::{
     cell::RefCell,
-    convert::TryFrom,
     fs::{File, OpenOptions},
     io::{stdin, stdout, BufWriter, Write},
     process,
@@ -41,6 +40,8 @@ impl Cell {
             _ => panic!("Unexpected color"),
         }
     }
+
+    #[allow(dead_code)]
     pub fn is_disc(&self) -> bool {
         match self {
             Cell::White | Cell::Black => true,
@@ -395,9 +396,14 @@ pub fn select_bot_impl(matches: &ArgMatches) -> Box<dyn Bot> {
     }
 }
 
-#[test]
-fn wincheck_1() {
-    let s = "BBBBBBBB
+#[cfg(test)]
+mod utils_test {
+    use crate::{board::Board, utils::*};
+    use std::convert::TryFrom;
+
+    #[test]
+    fn wincheck_1() {
+        let s = "BBBBBBBB
              BBBBBBBB
              BBBBBBBB
              BBBBBBBB
@@ -405,16 +411,16 @@ fn wincheck_1() {
              BBBBBBBB
              BBBBBBBB
              BBBBBBBB";
-    let b = Board::try_from(s.to_string()).unwrap();
-    assert_eq!(
-        wincheck(&b, &b.allowed_moves(Cell::White), true, Cell::Black),
-        EndState::WhiteWon
-    );
-}
+        let b = Board::try_from(s.to_string()).unwrap();
+        assert_eq!(
+            wincheck(&b, &b.allowed_moves(Cell::White), true, Cell::Black),
+            EndState::WhiteWon
+        );
+    }
 
-#[test]
-fn wincheck_2() {
-    let s = "BBBBBBBB
+    #[test]
+    fn wincheck_2() {
+        let s = "BBBBBBBB
              BBBBBBBB
              BBBBB___
              BBBBB__W
@@ -422,15 +428,16 @@ fn wincheck_2() {
              BBBBBB__
              BBBBBBBB
              BBBBBBBB";
-    let b = Board::try_from(s.to_string()).unwrap();
-    let win = wincheck(&b, &b.allowed_moves(Cell::White), true, Cell::Black);
-    assert!(win.is_over());
-    assert_eq!(win, EndState::WhiteWon);
-}
+        let b = Board::try_from(s.to_string()).unwrap();
+        let win =
+            wincheck(&b, &b.allowed_moves(Cell::White), true, Cell::Black);
+        assert!(win.is_over());
+        assert_eq!(win, EndState::WhiteWon);
+    }
 
-#[test]
-fn wincheck_3() {
-    let s = "BBBBBBBB
+    #[test]
+    fn wincheck_3() {
+        let s = "BBBBBBBB
              BBBBBBBB
              BBBBBBBB
              BBBBBBBB
@@ -438,8 +445,10 @@ fn wincheck_3() {
              WWWWWWWW
              WWWWWWWW
              WWWWWWWW";
-    let b = Board::try_from(s.to_string()).unwrap();
-    let win = wincheck(&b, &b.allowed_moves(Cell::White), true, Cell::Black);
-    assert!(win.is_over());
-    assert_eq!(win, EndState::Tie);
+        let b = Board::try_from(s.to_string()).unwrap();
+        let win =
+            wincheck(&b, &b.allowed_moves(Cell::White), true, Cell::Black);
+        assert!(win.is_over());
+        assert_eq!(win, EndState::Tie);
+    }
 }

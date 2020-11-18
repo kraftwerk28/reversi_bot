@@ -1,5 +1,5 @@
 use crate::{point::Point, utils::*};
-use rand::{distributions::WeightedIndex, prelude::*, rngs::ThreadRng, Rng};
+use rand::{prelude::*, rngs::ThreadRng, Rng};
 use std::fmt;
 
 #[derive(Copy, Clone)]

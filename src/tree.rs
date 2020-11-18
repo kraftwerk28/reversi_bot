@@ -116,6 +116,7 @@ impl Node {
         Board::simauto(self.board, self.color, is_anti)
     }
 
+    #[allow(dead_code)]
     pub fn best_child(&self) -> NodeRef {
         let mut best_node = self.children[0].clone();
         let mut best_score = 0f64;
@@ -130,6 +131,7 @@ impl Node {
         best_node
     }
 
+    #[allow(dead_code)]
     pub fn repr_node(nr: &NodeRef, indent: usize) -> String {
         let n = nr.borrow();
         let indstr = " ".repeat(indent * 2);
@@ -145,6 +147,7 @@ impl Node {
         )
     }
 
+    #[allow(dead_code)]
     pub fn score(&self) -> f64 {
         if self.nvisits == 0 {
             f64::MIN
