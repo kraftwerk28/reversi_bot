@@ -6,6 +6,7 @@ mod mcts2;
 mod minimax;
 mod point;
 mod sev;
+mod tree;
 
 use std::{thread, time};
 use utils::{parse_args, select_bot_impl};
