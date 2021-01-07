@@ -1,9 +1,9 @@
 #[macro_use]
 mod utils;
 mod bot;
-// mod mcts;
+mod mcts;
 mod mcts2;
-// mod minimax;
+mod minimax;
 mod runner;
 
 use runner::Runner;

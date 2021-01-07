@@ -3,7 +3,7 @@ use crate::{
     utils::*,
     utils::{board::Board, tree::Node},
 };
-use crossbeam::channel::unbounded;
+use crossbeam::channel;
 use rayon::prelude::*;
 use std::{
     io::Write,
@@ -18,7 +18,6 @@ pub struct MCTSBot {
     my_color: Cell,
     win_state: EndState,
     current_color: Cell,
-    allowed_moves: AllowedMoves,
     is_anti: bool,
     exploitation_value: f64,
 }
@@ -32,7 +31,6 @@ impl MCTSBot {
 
         let board = Board::initial(black_hole);
         let current_color = Cell::Black;
-        let allowed_moves = board.allowed_moves(current_color);
 
         let move_maxtime = arg_matches
             .value_of("time_limit")
@@ -51,7 +49,6 @@ impl MCTSBot {
             current_color,
             win_state: EndState::Unknown,
 
-            allowed_moves,
             log_file: get_logfile(&arg_matches),
             is_anti,
             move_maxtime: Duration::from_millis(move_maxtime),
@@ -68,15 +65,17 @@ impl MCTSBot {
     }
 
     fn mcts(&self) -> PlayerMove {
-        if self.allowed_moves.len() == 1 {
-            return self.allowed_moves.first().unwrap().clone();
+        let allowed_moves = self.board.allowed_moves(self.current_color);
+
+        if allowed_moves.len() == 1 {
+            return allowed_moves.first().unwrap().clone();
         }
 
-        let (stop_tx, stop_rx) = unbounded::<()>();
+        let (stop_tx, stop_rx) = channel::unbounded::<()>();
 
         let tim_thread = thread::spawn({
             let max_time = self.move_maxtime;
-            let stop_signals_count = self.allowed_moves.len();
+            let stop_signals_count = allowed_moves.len();
             move || {
                 let timer = Instant::now();
                 while timer.elapsed() < max_time {}
@@ -86,8 +85,7 @@ impl MCTSBot {
             }
         });
 
-        let scores = self
-            .allowed_moves
+        let scores = allowed_moves
             .par_iter()
             .map(|pl_move| {
                 let new_board = self.board.with_move(pl_move, self.my_color);
@@ -160,68 +158,5 @@ impl Bot for MCTSBot {
     }
     fn run_ai(&self) -> PlayerMove {
         self.mcts()
-    }
-
-    // fn run(&mut self) {
-    //     loop {
-    //         self.allowed_moves = self.board.allowed_moves(self.current_color);
-    //         self.win_state = wincheck(
-    //             &self.board,
-    //             &self.allowed_moves,
-    //             self.is_anti,
-    //             self.current_color,
-    //         );
-
-    //         if self.win_state.is_over() {
-    //             break;
-    //         }
-
-    //         if self.allowed_moves.len() > 0 {
-    //             if self.current_color == self.my_color {
-    //                 let pl_move = self.mcts();
-    //                 log!(self, "my move: {}", pl_move.0.to_ab());
-    //                 self.board.apply_move(&pl_move, self.current_color);
-    //                 Chan::send(CLIMove::Coord(pl_move.0));
-    //             } else {
-    //                 let pl_move = loop {
-    //                     let coord = Chan::read().coord();
-    //                     log!(self, "their move: {}", coord.to_ab());
-    //                     let pl_move = self
-    //                         .allowed_moves
-    //                         .iter()
-    //                         .find(|(ti, _)| *ti == coord);
-    //                     if let Some(pl_move) = pl_move {
-    //                         break pl_move;
-    //                     }
-    //                 };
-    //                 self.board.apply_move(&pl_move, self.current_color);
-    //             }
-    //         } else {
-    //             if self.current_color == self.my_color {
-    //                 Chan::send(CLIMove::Pass);
-    //             } else {
-    //                 Chan::read();
-    //             }
-    //         }
-    //         self.current_color = self.current_color.opposite();
-    //         log!(self, "{:?}", self.board);
-    //     }
-    // }
-
-    fn report(&self) {
-        log!(
-            self,
-            "{}",
-            match self.win_state {
-                EndState::Tie => "Tie!",
-                EndState::BlackWon => "Black won!",
-                EndState::WhiteWon => "White won!",
-                _ => "Game hadn't been completed.",
-            }
-        );
-        if let Some(logfile) = &self.log_file {
-            let lck = logfile.lock().unwrap();
-            lck.borrow_mut().flush().unwrap();
-        }
     }
 }

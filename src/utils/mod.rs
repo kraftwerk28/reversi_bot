@@ -1,8 +1,8 @@
 pub mod board;
 pub mod point;
+pub mod sev;
 pub mod tree;
 
-use board::Board;
 use clap::{App, AppSettings, Arg, ArgMatches};
 use point::Point;
 use std::{
@@ -14,6 +14,8 @@ use std::{
 };
 
 use crate::bot::Bot;
+
+use self::board::Board;
 
 // A small logging util
 macro_rules! log {
@@ -399,11 +401,10 @@ pub fn uct_score(parent_nvisits: u64, nwins: u64, nvisits: u64, c: f64) -> f64 {
 }
 
 pub fn select_bot_impl(matches: &ArgMatches) -> Box<dyn Bot> {
-    // use crate::{mcts, mcts2, minimax};
-    use crate::mcts2;
+    use crate::{mcts, mcts2, minimax};
     match matches.value_of("bot_impl").unwrap() {
-        // "minimax" => Box::new(minimax::MinimaxBot::new(matches)),
-        // "mcts_basic" => Box::new(mcts::MCTSBot::new(matches)),
+        "minimax" => Box::new(minimax::MinimaxBot::new(matches)),
+        "mcts_basic" => Box::new(mcts::MCTSBot::new(matches)),
         "mcts" => Box::new(mcts2::MCTSBot::new(matches)),
         _ => unreachable!(),
     }
@@ -419,7 +420,7 @@ pub fn read_black_hole(matches: &ArgMatches) -> Option<Point> {
 
 #[cfg(test)]
 mod utils_test {
-    use crate::{board::Board, utils::*};
+    use crate::utils::*;
     use std::convert::TryFrom;
 
     #[test]

@@ -1,22 +1,20 @@
-use crate::{board::Board, sev::*, utils::*};
+use crate::{
+    bot::Bot,
+    utils::sev::*,
+    utils::{board::Board, *},
+};
 use clap::ArgMatches;
 use rayon::prelude::*;
-use std::{
-    io::Write,
-    sync::Mutex,
-    time::{Duration, Instant},
-};
+use std::{io::Write, sync::Mutex};
 
 pub struct MinimaxBot {
     board: Board,
     my_color: Cell,
     current_color: Cell,
     win_state: EndState,
-    allowed_moves: AllowedMoves,
     max_tree_depth: usize,
     log_file: LogFile,
     is_anti: bool,
-    total_timer: Duration,
 }
 
 impl MinimaxBot {
@@ -39,11 +37,9 @@ impl MinimaxBot {
             my_color,
             current_color,
             win_state: EndState::Unknown,
-            allowed_moves,
             max_tree_depth,
             log_file: get_logfile(&arg_matches),
             is_anti,
-            total_timer: Duration::default(),
         };
 
         log!(bot, "alg: MiniMax");
@@ -56,13 +52,14 @@ impl MinimaxBot {
     }
 
     fn run_minimax(&self) -> PlayerMove {
+        let allowed_moves = self.board.allowed_moves(self.current_color);
         let best_eval = {
             let score = if self.is_anti { Score::MAX } else { Score::MIN };
-            let tup = (score, self.allowed_moves.first().unwrap());
+            let tup = (score, allowed_moves.first().unwrap());
             Mutex::new(tup)
         };
         let alphabeta = (Score::MIN, Score::MAX);
-        self.allowed_moves.par_iter().for_each(|pl_move| {
+        allowed_moves.par_iter().for_each(|pl_move| {
             let score = self.minimax(
                 self.board.with_move(pl_move, self.my_color),
                 self.max_tree_depth,
@@ -125,70 +122,94 @@ impl MinimaxBot {
     }
 }
 
+// impl Bot for MinimaxBot {
+//     fn report(&self) {
+//         log!(
+//             self,
+//             "{}",
+//             match self.win_state {
+//                 EndState::Tie => "Tie!",
+//                 EndState::BlackWon => "Black won!",
+//                 EndState::WhiteWon => "White won!",
+//                 _ => "Game hadn't been completed.",
+//             }
+//         );
+//         if let Some(logfile) = &self.log_file {
+//             let lck = logfile.lock().unwrap();
+//             lck.borrow_mut().flush().unwrap();
+//         }
+//     }
+
+//     fn run(&mut self) {
+//         loop {
+//             self.allowed_moves = self.board.allowed_moves(self.current_color);
+//             self.win_state = wincheck(
+//                 &self.board,
+//                 &self.allowed_moves,
+//                 self.is_anti,
+//                 self.current_color,
+//             );
+
+//             if self.win_state.is_over() {
+//                 break;
+//             }
+
+//             if self.allowed_moves.len() > 0 {
+//                 if self.current_color == self.my_color {
+//                     let timer = Instant::now();
+//                     let pl_move = self.run_minimax();
+//                     log!(
+//                         self,
+//                         "my move: {}, time spent: {}ms",
+//                         pl_move.0.to_ab(),
+//                         timer.elapsed().as_millis(),
+//                     );
+//                     self.total_timer += timer.elapsed();
+//                     self.board.apply_move(&pl_move, self.current_color);
+//                     Chan::send(CLIMove::Coord(pl_move.0));
+//                 } else {
+//                     let coord = Chan::read().coord();
+//                     let pl_move = self
+//                         .allowed_moves
+//                         .iter()
+//                         .find(|(ti, _)| *ti == coord)
+//                         .expect("Not a possible move from opponent")
+//                         .clone();
+//                     self.board.apply_move(&pl_move, self.current_color);
+//                 }
+//             } else {
+//                 if self.current_color == self.my_color {
+//                     Chan::send(CLIMove::Pass);
+//                 } else {
+//                     Chan::read();
+//                 }
+//             }
+//             self.current_color = self.current_color.opposite();
+//             log!(self, "{:?}", self.board);
+//         }
+//     }
+// }
+
 impl Bot for MinimaxBot {
-    fn report(&self) {
-        log!(
-            self,
-            "{}",
-            match self.win_state {
-                EndState::Tie => "Tie!",
-                EndState::BlackWon => "Black won!",
-                EndState::WhiteWon => "White won!",
-                _ => "Game hadn't been completed.",
-            }
-        );
-        if let Some(logfile) = &self.log_file {
-            let lck = logfile.lock().unwrap();
-            lck.borrow_mut().flush().unwrap();
-        }
+    fn status(&self) -> EndState {
+        self.win_state
     }
-
-    fn run(&mut self) {
-        loop {
-            self.allowed_moves = self.board.allowed_moves(self.current_color);
-            self.win_state = wincheck(
-                &self.board,
-                &self.allowed_moves,
-                self.is_anti,
-                self.current_color,
-            );
-
-            if self.win_state.is_over() {
-                break;
-            }
-
-            if self.allowed_moves.len() > 0 {
-                if self.current_color == self.my_color {
-                    let timer = Instant::now();
-                    let pl_move = self.run_minimax();
-                    log!(
-                        self,
-                        "my move: {}, time spent: {}ms",
-                        pl_move.0.to_ab(),
-                        timer.elapsed().as_millis(),
-                    );
-                    self.total_timer += timer.elapsed();
-                    self.board.apply_move(&pl_move, self.current_color);
-                    Chan::send(CLIMove::Coord(pl_move.0));
-                } else {
-                    let coord = Chan::read().coord();
-                    let pl_move = self
-                        .allowed_moves
-                        .iter()
-                        .find(|(ti, _)| *ti == coord)
-                        .expect("Not a possible move from opponent")
-                        .clone();
-                    self.board.apply_move(&pl_move, self.current_color);
-                }
-            } else {
-                if self.current_color == self.my_color {
-                    Chan::send(CLIMove::Pass);
-                } else {
-                    Chan::read();
-                }
-            }
-            self.current_color = self.current_color.opposite();
-            log!(self, "{:?}", self.board);
-        }
+    fn allowed_tiles(&self) -> AllowedMoves {
+        self.board.allowed_moves(self.current_color)
+    }
+    fn apply_move(&mut self, player_move: &PlayerMove) {
+        self.board.apply_move(&player_move, self.current_color);
+    }
+    fn current_color(&self) -> Cell {
+        self.current_color
+    }
+    fn set_color(&mut self, color: Cell) {
+        self.current_color = color;
+    }
+    fn self_color(&self) -> Cell {
+        self.my_color
+    }
+    fn run_ai(&self) -> PlayerMove {
+        self.run_minimax()
     }
 }

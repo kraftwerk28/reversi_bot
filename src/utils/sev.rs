@@ -1,5 +1,6 @@
 #![allow(dead_code)]
-use crate::{board::Board, point::Point, utils::*};
+
+use super::*;
 
 /// Simplest SEV, with depth of 5 leads to 0.89 winrate
 pub fn static_eval(board: &Board, player_color: Cell) -> Score {

@@ -112,9 +112,9 @@ impl Board {
     }
 
     pub fn sim_heur(
-        mut board: Board,
-        mut color: Cell,
-        my_color: Cell,
+        _board: Board,
+        _color: Cell,
+        _my_color: Cell,
     ) -> EndState {
         EndState::Unknown
     }

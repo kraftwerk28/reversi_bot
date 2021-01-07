@@ -27,13 +27,11 @@ impl Runner {
             if allowed_moves.len() > 0 {
                 if is_self_move {
                     let pl_move = bot.run_ai();
-                    // log!(self, "my move: {}", pl_move.0.to_ab());
                     bot.apply_move(&pl_move);
                     Chan::send(CLIMove::Coord(pl_move.0));
                 } else {
                     let pl_move = loop {
                         let coord = Chan::read().coord();
-                        // log!(self, "their move: {}", coord.to_ab());
                         let pl_move =
                             allowed_moves.iter().find(|(ti, _)| *ti == coord);
                         if let Some(pl_move) = pl_move {
@@ -50,8 +48,24 @@ impl Runner {
                 }
             }
             bot.set_color(cur_color.opposite());
-            // self.current_color = self.current_color.opposite();
             // log!(self, "{:?}", self.board);
         }
+    }
+
+    fn report(&self) {
+        // log!(
+        //     self,
+        //     "{}",
+        //     match self.win_state {
+        //         EndState::Tie => "Tie!",
+        //         EndState::BlackWon => "Black won!",
+        //         EndState::WhiteWon => "White won!",
+        //         _ => "Game hadn't been completed.",
+        //     }
+        // );
+        // if let Some(logfile) = &self.log_file {
+        //     let lck = logfile.lock().unwrap();
+        //     lck.borrow_mut().flush().unwrap();
+        // }
     }
 }
