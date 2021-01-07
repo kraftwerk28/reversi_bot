@@ -1,4 +1,4 @@
-use crate::{board::Board, utils::*};
+use crate::{board::Board, bot::Bot, utils::*};
 use crossbeam::channel::{select, unbounded};
 use rand::thread_rng;
 use rayon::prelude::*;
@@ -22,7 +22,7 @@ pub struct MCTSBot {
 
 impl MCTSBot {
     pub fn new(arg_matches: &clap::ArgMatches) -> Self {
-        let black_hole = Chan::read().coord();
+        let black_hole = read_black_hole(arg_matches);
         let my_color = Chan::read().color();
 
         let is_anti = !arg_matches.is_present("no_anti");
@@ -49,7 +49,7 @@ impl MCTSBot {
         };
 
         log!(bot, "alg: Basic MCTS");
-        log!(bot, "black hole: {:?}", black_hole.to_ab());
+        log!(bot, "black hole: {:?}", black_hole.map(|p| p.to_ab()));
         log!(bot, "my color: {:?}", my_color);
         log!(bot, "anti reversi mode: {}", is_anti);
         log!(bot, "move timeout: {}\n\nBEGIN:", move_maxtime);

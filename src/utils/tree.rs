@@ -1,4 +1,4 @@
-use crate::{board::Board, utils::*};
+use super::*;
 use rand::{thread_rng, Rng};
 use std::{
     cell::RefCell,
@@ -70,16 +70,20 @@ impl Node {
         assert!(node.children.is_empty());
         let allowed = node.board.allowed_moves(node.color);
 
-        if !allowed.is_empty() {
+        if allowed.is_empty() {
+            node.leaf = true;
+            noderef.clone()
+        } else {
             for player_move in allowed.iter() {
                 let color = node.color.opposite();
                 let board = node.board.with_move(&player_move, node.color);
+
                 let child_node = Node {
                     color,
                     board,
-                    parent: Some(Rc::downgrade(&noderef)),
                     nwins: 0,
                     nvisits: 0,
+                    parent: Some(Rc::downgrade(&noderef)),
                     children: Vec::new(),
                     player_move: Some(player_move.clone()),
                     leaf: false,
@@ -89,9 +93,6 @@ impl Node {
             }
             let ind = rng.gen_range(0, allowed.len());
             node.children[ind].clone()
-        } else {
-            node.leaf = true;
-            noderef.clone()
         }
     }
 
@@ -104,7 +105,8 @@ impl Node {
                     node.nwins += 1;
                 }
             }
-            if let Some(parent) = &noderef.clone().borrow().parent {
+            let cloned = noderef.clone();
+            if let Some(parent) = &cloned.borrow().parent {
                 noderef = parent.upgrade().unwrap();
             } else {
                 break;

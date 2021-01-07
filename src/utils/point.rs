@@ -7,7 +7,8 @@ pub struct Point(TileIdx);
 impl Point {
     pub fn from_ab(ab: &str) -> Option<Self> {
         let mut chars = ab.chars();
-        let x = chars.next().unwrap() as TileIdx;
+        let x = chars.next().and_then(|c| c.to_uppercase().next()).unwrap()
+            as TileIdx;
         let y = chars.next().and_then(|c| c.to_digit(10)).unwrap() as TileIdx;
         if (1..=8).contains(&y) && (65..=72).contains(&x) {
             Some(Self::from_xy(x - 65, y - 1))

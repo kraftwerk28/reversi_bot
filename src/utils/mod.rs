@@ -1,5 +1,10 @@
-use crate::{board::Board, point::Point};
+pub mod board;
+pub mod point;
+pub mod tree;
+
+use board::Board;
 use clap::{App, AppSettings, Arg, ArgMatches};
+use point::Point;
 use std::{
     cell::RefCell,
     fs::{File, OpenOptions},
@@ -7,6 +12,8 @@ use std::{
     process,
     sync::Mutex,
 };
+
+use crate::bot::Bot;
 
 // A small logging util
 macro_rules! log {
@@ -17,11 +24,6 @@ macro_rules! log {
             writeln!(writable, $($fmtargs),+).unwrap();
         }
     }
-}
-
-pub trait Bot {
-    fn run(&mut self);
-    fn report(&self);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -224,13 +226,14 @@ pub fn min_of(s1: Score, s2: Score) -> Score {
 
 #[inline]
 pub fn get_allowed_moves(board: &Board, color: Cell) -> AllowedMoves {
-    let mut res: AllowedMoves = Vec::new();
     let rev_color = color.opposite();
     let only_current_tiles = board
         .0
         .iter()
         .enumerate()
-        .filter(|(_, &cell)| cell == color);
+        .filter(|(_, &cell)| cell == color)
+        .collect::<Vec<_>>();
+    let mut res: AllowedMoves = Vec::with_capacity(only_current_tiles.len());
 
     for (index, _) in only_current_tiles {
         let start_point = Point::from_idx(index as TileIdx);
@@ -239,8 +242,9 @@ pub fn get_allowed_moves(board: &Board, color: Cell) -> AllowedMoves {
         for (dx, dy) in TRAVERSE_DIRECTIONS.iter() {
             let (mut x, mut y) = (x + dx, y + dy);
             let mut to_be_flipped: Vec<Point> = Vec::with_capacity(6);
+            let range = 0..8;
 
-            while (0..8).contains(&x) && (0..8).contains(&y) {
+            while range.contains(&x) && range.contains(&y) {
                 let tile_pt = Point::from_xy(x, y);
                 let tile = board.at(tile_pt);
                 if tile == rev_color {
@@ -294,7 +298,15 @@ pub fn parse_args() -> ArgMatches<'static> {
             Arg::with_name("no_anti")
                 .long("no-anti")
                 .env("NO_ANTI")
+                .takes_value(false)
                 .help("Play regular reversi"),
+        )
+        .arg(
+            Arg::with_name("no_blackhole")
+                .long("no-blackhole")
+                .env("NO_BLACKHOLE")
+                .takes_value(false)
+                .help("Disable BlackHole mode"),
         )
         .arg(
             Arg::with_name("time_limit")
@@ -387,12 +399,21 @@ pub fn uct_score(parent_nvisits: u64, nwins: u64, nvisits: u64, c: f64) -> f64 {
 }
 
 pub fn select_bot_impl(matches: &ArgMatches) -> Box<dyn Bot> {
-    use crate::{mcts, mcts2, minimax};
+    // use crate::{mcts, mcts2, minimax};
+    use crate::mcts2;
     match matches.value_of("bot_impl").unwrap() {
-        "minimax" => Box::new(minimax::MinimaxBot::new(matches)),
-        "mcts_basic" => Box::new(mcts::MCTSBot::new(matches)),
+        // "minimax" => Box::new(minimax::MinimaxBot::new(matches)),
+        // "mcts_basic" => Box::new(mcts::MCTSBot::new(matches)),
         "mcts" => Box::new(mcts2::MCTSBot::new(matches)),
         _ => unreachable!(),
+    }
+}
+
+pub fn read_black_hole(matches: &ArgMatches) -> Option<Point> {
+    if matches.is_present("no_blackhole") {
+        None
+    } else {
+        Some(Chan::read().coord())
     }
 }
 

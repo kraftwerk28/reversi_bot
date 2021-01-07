@@ -1,4 +1,8 @@
-use crate::{board::Board, tree::Node, utils::*};
+use crate::{
+    bot::Bot,
+    utils::*,
+    utils::{board::Board, tree::Node},
+};
 use crossbeam::channel::unbounded;
 use rayon::prelude::*;
 use std::{
@@ -21,7 +25,7 @@ pub struct MCTSBot {
 
 impl MCTSBot {
     pub fn new(arg_matches: &clap::ArgMatches) -> Self {
-        let black_hole = Chan::read().coord();
+        let black_hole = read_black_hole(arg_matches);
         let my_color = Chan::read().color();
 
         let is_anti = !arg_matches.is_present("no_anti");
@@ -55,7 +59,7 @@ impl MCTSBot {
         };
 
         log!(bot, "alg: Advanced MCTS");
-        log!(bot, "black hole: {:?}", black_hole.to_ab());
+        log!(bot, "black hole: {:?}", black_hole.map(|p| p.to_ab()));
         log!(bot, "my color: {:?}", my_color);
         log!(bot, "anti reversi mode: {}", is_anti);
         log!(bot, "move timeout: {}\n\nBEGIN:", move_maxtime);
@@ -136,48 +140,73 @@ impl MCTSBot {
 }
 
 impl Bot for MCTSBot {
-    fn run(&mut self) {
-        loop {
-            self.allowed_moves = self.board.allowed_moves(self.current_color);
-            self.win_state = wincheck(
-                &self.board,
-                &self.allowed_moves,
-                self.is_anti,
-                self.current_color,
-            );
-
-            if self.win_state.is_over() {
-                break;
-            }
-
-            if self.allowed_moves.len() > 0 {
-                if self.current_color == self.my_color {
-                    let pl_move = self.mcts();
-                    log!(self, "my move: {}", pl_move.0.to_ab());
-                    self.board.apply_move(&pl_move, self.current_color);
-                    Chan::send(CLIMove::Coord(pl_move.0));
-                } else {
-                    let coord = Chan::read().coord();
-                    log!(self, "their move: {}", coord.to_ab());
-                    let pl_move = self
-                        .allowed_moves
-                        .iter()
-                        .find(|(ti, _)| *ti == coord)
-                        .expect("Not a possible move from opponent")
-                        .clone();
-                    self.board.apply_move(&pl_move, self.current_color);
-                }
-            } else {
-                if self.current_color == self.my_color {
-                    Chan::send(CLIMove::Pass);
-                } else {
-                    Chan::read();
-                }
-            }
-            self.current_color = self.current_color.opposite();
-            log!(self, "{:?}", self.board);
-        }
+    fn status(&self) -> EndState {
+        self.win_state
     }
+    fn allowed_tiles(&self) -> AllowedMoves {
+        self.board.allowed_moves(self.current_color)
+    }
+    fn apply_move(&mut self, player_move: &PlayerMove) {
+        self.board.apply_move(&player_move, self.current_color);
+    }
+    fn current_color(&self) -> Cell {
+        self.current_color
+    }
+    fn set_color(&mut self, color: Cell) {
+        self.current_color = color;
+    }
+    fn self_color(&self) -> Cell {
+        self.my_color
+    }
+    fn run_ai(&self) -> PlayerMove {
+        self.mcts()
+    }
+
+    // fn run(&mut self) {
+    //     loop {
+    //         self.allowed_moves = self.board.allowed_moves(self.current_color);
+    //         self.win_state = wincheck(
+    //             &self.board,
+    //             &self.allowed_moves,
+    //             self.is_anti,
+    //             self.current_color,
+    //         );
+
+    //         if self.win_state.is_over() {
+    //             break;
+    //         }
+
+    //         if self.allowed_moves.len() > 0 {
+    //             if self.current_color == self.my_color {
+    //                 let pl_move = self.mcts();
+    //                 log!(self, "my move: {}", pl_move.0.to_ab());
+    //                 self.board.apply_move(&pl_move, self.current_color);
+    //                 Chan::send(CLIMove::Coord(pl_move.0));
+    //             } else {
+    //                 let pl_move = loop {
+    //                     let coord = Chan::read().coord();
+    //                     log!(self, "their move: {}", coord.to_ab());
+    //                     let pl_move = self
+    //                         .allowed_moves
+    //                         .iter()
+    //                         .find(|(ti, _)| *ti == coord);
+    //                     if let Some(pl_move) = pl_move {
+    //                         break pl_move;
+    //                     }
+    //                 };
+    //                 self.board.apply_move(&pl_move, self.current_color);
+    //             }
+    //         } else {
+    //             if self.current_color == self.my_color {
+    //                 Chan::send(CLIMove::Pass);
+    //             } else {
+    //                 Chan::read();
+    //             }
+    //         }
+    //         self.current_color = self.current_color.opposite();
+    //         log!(self, "{:?}", self.board);
+    //     }
+    // }
 
     fn report(&self) {
         log!(

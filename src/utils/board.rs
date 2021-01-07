@@ -1,4 +1,5 @@
-use crate::{point::Point, utils::*};
+use crate::utils::*;
+use point::Point;
 use rand::{prelude::*, rngs::ThreadRng, Rng};
 use std::fmt;
 
@@ -6,13 +7,17 @@ use std::fmt;
 pub struct Board(pub [Cell; 64]);
 
 impl Board {
-    pub fn initial(black_hole: Point) -> Self {
-        *Board([Cell::Empty; 64])
+    pub fn initial(black_hole: Option<Point>) -> Self {
+        let mut board = Board([Cell::Empty; 64]);
+        board
             .place(Point::from_xy(3, 3), Cell::White)
             .place(Point::from_xy(4, 4), Cell::White)
             .place(Point::from_xy(3, 4), Cell::Black)
-            .place(Point::from_xy(4, 3), Cell::Black)
-            .place(black_hole, Cell::BlackHole)
+            .place(Point::from_xy(4, 3), Cell::Black);
+        if let Some(bh) = black_hole {
+            board.place(bh, Cell::BlackHole);
+        }
+        board
     }
 
     pub fn place(&mut self, p: Point, color: Cell) -> &mut Self {
@@ -104,6 +109,14 @@ impl Board {
             board.apply_move(&mv, color);
             color = color.opposite();
         }
+    }
+
+    pub fn sim_heur(
+        mut board: Board,
+        mut color: Cell,
+        my_color: Cell,
+    ) -> EndState {
+        EndState::Unknown
     }
 }
 

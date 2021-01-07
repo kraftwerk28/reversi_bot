@@ -1,13 +1,12 @@
 #[macro_use]
 mod utils;
-mod board;
-mod mcts;
+mod bot;
+// mod mcts;
 mod mcts2;
-mod minimax;
-mod point;
-mod sev;
-mod tree;
+// mod minimax;
+mod runner;
 
+use runner::Runner;
 use std::{thread, time};
 use utils::{parse_args, select_bot_impl};
 
@@ -19,10 +18,12 @@ fn main() {
         println!(env!("CARGO_PKG_VERSION"));
         return;
     }
+    let bot = select_bot_impl(&matches);
+    let mut runner = Runner::new(bot);
 
-    let mut bot = select_bot_impl(&matches);
-    bot.run();
-    bot.report();
+    runner.run();
+    // bot.run();
+    // bot.report();
 
     // Required to satisfy tester
     // But the tester still doesn't kill the process :(
