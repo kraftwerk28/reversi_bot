@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crate::{
     bot::Bot,
     utils::{CLIMove, Chan},
@@ -49,23 +51,26 @@ impl Runner {
             }
             bot.set_color(cur_color.opposite());
             // log!(self, "{:?}", self.board);
+            if let Some(logfile) = bot.get_logfile() {
+                logfile.lock().unwrap().flush().unwrap();
+            }
         }
     }
 
-    fn report(&self) {
-        // log!(
-        //     self,
-        //     "{}",
-        //     match self.win_state {
-        //         EndState::Tie => "Tie!",
-        //         EndState::BlackWon => "Black won!",
-        //         EndState::WhiteWon => "White won!",
-        //         _ => "Game hadn't been completed.",
-        //     }
-        // );
-        // if let Some(logfile) = &self.log_file {
-        //     let lck = logfile.lock().unwrap();
-        //     lck.borrow_mut().flush().unwrap();
-        // }
-    }
+    //     fn report(&self) {
+    //         log!(
+    //             self,
+    //             "{}",
+    //             match self.win_state {
+    //                 EndState::Tie => "Tie!",
+    //                 EndState::BlackWon => "Black won!",
+    //                 EndState::WhiteWon => "White won!",
+    //                 _ => "Game hadn't been completed.",
+    //             }
+    //         );
+    //         if let Some(logfile) = &self.log_file {
+    //             let lck = logfile.lock().unwrap();
+    //             lck.borrow_mut().flush().unwrap();
+    //         }
+    //     }
 }

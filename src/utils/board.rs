@@ -6,6 +6,25 @@ use std::fmt;
 #[derive(Copy, Clone)]
 pub struct Board(pub [Cell; 64]);
 
+#[derive(Copy, Clone)]
+pub enum MainLine {
+    Top,
+    Left,
+    Right,
+    Bottom,
+    TopLeftBottomRight,
+    TopRightBottomLeft,
+}
+
+pub const MAINLINES: &[MainLine] = &[
+    MainLine::Top,
+    MainLine::Left,
+    MainLine::Right,
+    MainLine::Bottom,
+    MainLine::TopLeftBottomRight,
+    MainLine::TopRightBottomLeft,
+];
+
 impl Board {
     pub fn initial(black_hole: Option<Point>) -> Self {
         let mut board = Board([Cell::Empty; 64]);
@@ -111,12 +130,38 @@ impl Board {
         }
     }
 
-    pub fn sim_heur(
-        _board: Board,
-        _color: Cell,
-        _my_color: Cell,
-    ) -> EndState {
-        EndState::Unknown
+    #[inline]
+    pub fn nempty_neighbours(&self, pos: Point) -> i32 {
+        let (px, py) = pos.to_xy();
+        let mut res = 0;
+        for y in if py > 0 { -1 } else { 0 }..=if py < 7 { 1 } else { 0 } {
+            for x in if px > 0 { -1 } else { 0 }..=if px < 7 { 1 } else { 0 } {
+                if x == 0 && y == 0 {
+                    continue;
+                }
+                if self.at(Point::from_xy(px + x, py + y)) == Cell::Empty {
+                    res += 1;
+                }
+            }
+        }
+        res
+    }
+
+    #[inline]
+    pub fn mainline(&self, mainline: MainLine) -> Vec<Cell> {
+        use MainLine::*;
+        let f = match mainline {
+            Top => |i| (i, 0),
+            Left => |i| (0, i),
+            Right => |i| (7, i),
+            Bottom => |i| (i, 7),
+            TopLeftBottomRight => |i| (i, i),
+            TopRightBottomLeft => |i| (7 - i, i),
+        };
+        (0..8)
+            .map(f)
+            .map(|(x, y)| self.at(Point::from_xy(x, y)))
+            .collect()
     }
 }
 
@@ -153,44 +198,70 @@ impl std::convert::TryFrom<String> for Board {
     }
 }
 
-// impl IntoIterator for Board {
-//     type Item = &'static Cell;
-//     type IntoIter = std::slice::Iter<'static, Self::Item>;
-//     fn into_iter(self) -> Self::IntoIter {
-//         (&self.0).into_iter()
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_board_count() {
+        let board = Board::initial(Some(Point::from_xy(0, 0)));
+        assert_eq!(board.count(Cell::Black), 2);
+        assert_eq!(board.count(Cell::White), 2);
+    }
 
-#[test]
-fn test_board_count() {
-    let board = Board::initial(Point::from_xy(0, 0));
-    assert_eq!(board.count(Cell::Black), 2);
-    assert_eq!(board.count(Cell::White), 2);
-}
+    #[test]
+    fn test_board_count_move1() {
+        let mut board = Board::initial(Some(Point::from_xy(0, 0)));
+        let allowed_moves = board.allowed_moves(Cell::White);
+        board.apply_move(allowed_moves.first().unwrap(), Cell::White);
+        assert_eq!(board.count(Cell::Black), 1);
+        assert_eq!(board.count(Cell::White), 4);
+    }
 
-#[test]
-fn test_board_count_move1() {
-    let mut board = Board::initial(Point::from_xy(0, 0));
-    let allowed_moves = board.allowed_moves(Cell::White);
-    board.apply_move(allowed_moves.first().unwrap(), Cell::White);
-    assert_eq!(board.count(Cell::Black), 1);
-    assert_eq!(board.count(Cell::White), 4);
-}
+    #[test]
+    fn test_board_count_move2() {
+        let board = Board::initial(Some(Point::from_xy(0, 0)));
+        let allowed_moves = board.allowed_moves(Cell::Black);
+        let board =
+            board.with_move(allowed_moves.first().unwrap(), Cell::Black);
+        assert_eq!(board.count(Cell::White), 1);
+        assert_eq!(board.count(Cell::Black), 4);
+    }
 
-#[test]
-fn test_board_count_move2() {
-    let board = Board::initial(Point::from_xy(0, 0));
-    let allowed_moves = board.allowed_moves(Cell::Black);
-    let board = board.with_move(allowed_moves.first().unwrap(), Cell::Black);
-    assert_eq!(board.count(Cell::White), 1);
-    assert_eq!(board.count(Cell::Black), 4);
-}
+    #[test]
+    fn test_board_indexes() {
+        let b = Board::initial(Some(Point::from_xy(1, 1)));
+        for (i, _) in b.0.iter().enumerate() {
+            let tile_index = Point::from_idx(i as TileIdx).unmirror8().to_idx();
+            assert!([0, 1, 2, 3, 9, 10, 11, 18, 19, 27].contains(&tile_index));
+        }
+    }
 
-#[test]
-fn test_board_indexes() {
-    let b = Board::initial(Point::from_xy(1, 1));
-    for (i, _) in b.0.iter().enumerate() {
-        let tile_index = Point::from_idx(i as TileIdx).unmirror8().to_idx();
-        assert!([0, 1, 2, 3, 9, 10, 11, 18, 19, 27].contains(&tile_index));
+    #[test]
+    fn test_empty_neighbours() {
+        let board = Board::initial(Some(Point::from_xy(0, 0)));
+        assert_eq!(board.nempty_neighbours(Point::from_xy(3, 4)), 5);
+        assert_eq!(board.nempty_neighbours(Point::from_xy(5, 5)), 7);
+    }
+
+    #[test]
+    fn test_board_mainline() {
+        use Cell::*;
+        let board = Board::initial(Some(Point::from_xy(0, 0)));
+        assert_eq!(
+            board.mainline(MainLine::TopLeftBottomRight),
+            vec![BlackHole, Empty, Empty, White, White, Empty, Empty, Empty],
+        );
+        assert_eq!(
+            board.mainline(MainLine::Top),
+            vec![BlackHole, Empty, Empty, Empty, Empty, Empty, Empty, Empty],
+        );
+        assert_eq!(
+            board.mainline(MainLine::Bottom),
+            vec![Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty],
+        );
+        assert_eq!(
+            board.mainline(MainLine::TopRightBottomLeft),
+            vec![Empty, Empty, Empty, Black, Black, Empty, Empty, Empty],
+        );
     }
 }

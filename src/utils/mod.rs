@@ -6,11 +6,10 @@ pub mod tree;
 use clap::{App, AppSettings, Arg, ArgMatches};
 use point::Point;
 use std::{
-    cell::RefCell,
     fs::{File, OpenOptions},
     io::{stdin, stdout, BufWriter, Write},
     process,
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
 use crate::bot::Bot;
@@ -21,9 +20,8 @@ use self::board::Board;
 macro_rules! log {
     ($slf:ident, $($fmtargs:expr),+ $(,)*) => {
         if let Some(log_file) = &$slf.log_file {
-            let lck = log_file.lock().unwrap();
-            let mut writable = lck.borrow_mut();
-            writeln!(writable, $($fmtargs),+).unwrap();
+            let mut lck = log_file.lock().unwrap();
+            writeln!(lck, $($fmtargs),+).unwrap();
         }
     }
 }
@@ -45,10 +43,19 @@ impl Cell {
         }
     }
 
+    #[inline]
     #[allow(dead_code)]
     pub fn is_disc(&self) -> bool {
         match self {
             Cell::White | Cell::Black => true,
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Cell::Empty => true,
             _ => false,
         }
     }
@@ -113,7 +120,7 @@ impl CLIMove {
 pub type TileIdx = i8;
 pub type PlayerMove = (Point, Vec<Point>);
 pub type AllowedMoves = Vec<PlayerMove>;
-pub type Score = i64;
+pub type Score = i32;
 pub type AlphaBeta = (Score, Score);
 
 pub fn input() -> String {
@@ -218,6 +225,7 @@ pub fn max_of(s1: Score, s2: Score) -> Score {
     }
 }
 
+#[allow(dead_code)]
 pub fn min_of(s1: Score, s2: Score) -> Score {
     if s1 > s2 {
         s2
@@ -316,7 +324,7 @@ pub fn parse_args() -> ArgMatches<'static> {
                 .short("t")
                 .takes_value(true)
                 .env("MAX_TIME")
-                .default_value("4000")
+                .default_value("4950")
                 .help("Set time limit in milliseconds (for MCTS)"),
         )
         .arg(
@@ -336,7 +344,8 @@ pub fn parse_args() -> ArgMatches<'static> {
         .get_matches()
 }
 
-pub type LogFile = Option<Mutex<RefCell<BufWriter<File>>>>;
+pub type LogFile = Option<Arc<Mutex<BufWriter<File>>>>;
+
 pub fn get_logfile(matches: &ArgMatches) -> LogFile {
     matches.value_of("log_file").map(|name| {
         OpenOptions::new()
@@ -344,7 +353,7 @@ pub fn get_logfile(matches: &ArgMatches) -> LogFile {
             .truncate(true)
             .write(true)
             .open(name)
-            .map(|f| Mutex::new(RefCell::new(BufWriter::new(f))))
+            .map(|f| Arc::new(Mutex::new(BufWriter::new(f))))
             .unwrap()
     })
 }

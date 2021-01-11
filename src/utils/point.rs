@@ -5,6 +5,7 @@ use std::{char, fmt};
 pub struct Point(TileIdx);
 
 impl Point {
+    #[inline]
     pub fn from_ab(ab: &str) -> Option<Self> {
         let mut chars = ab.chars();
         let x = chars.next().and_then(|c| c.to_uppercase().next()).unwrap()
@@ -17,6 +18,7 @@ impl Point {
         }
     }
 
+    #[inline]
     pub fn to_ab(&self) -> String {
         let (x, y) = self.to_xy();
         format!(
@@ -26,6 +28,7 @@ impl Point {
         )
     }
 
+    #[inline]
     pub fn from_idx(idx: TileIdx) -> Self {
         Self(idx)
     }
@@ -35,14 +38,17 @@ impl Point {
         self.0
     }
 
+    #[inline]
     pub fn from_xy(x: TileIdx, y: TileIdx) -> Self {
         Self(y * 8 + x)
     }
 
+    #[inline]
     pub fn to_xy(&self) -> (TileIdx, TileIdx) {
         (self.0 % 8, self.0 / 8)
     }
 
+    #[inline]
     pub fn usize(&self) -> usize {
         self.0 as usize
     }
@@ -58,6 +64,7 @@ impl Point {
         ]
     }
 
+    #[inline]
     pub fn unmirror4(&self) -> Self {
         let (x, y) = self.to_xy();
         Self::from_xy(
@@ -66,6 +73,7 @@ impl Point {
         )
     }
 
+    #[inline]
     pub fn unmirror8(&self) -> Self {
         let (x, y) = self.unmirror4().to_xy();
         if x > y {

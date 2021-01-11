@@ -18,11 +18,11 @@ fn main() {
         println!(env!("CARGO_PKG_VERSION"));
         return;
     }
+
     let bot = select_bot_impl(&matches);
     let mut runner = Runner::new(bot);
 
     runner.run();
-    // bot.run();
     // bot.report();
 
     // Required to satisfy tester

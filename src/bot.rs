@@ -1,4 +1,4 @@
-use crate::utils::{AllowedMoves, Cell, EndState, PlayerMove};
+use crate::utils::{AllowedMoves, Cell, EndState, LogFile, PlayerMove};
 
 pub trait Bot {
     fn allowed_tiles(&self) -> AllowedMoves;
@@ -8,4 +8,5 @@ pub trait Bot {
     fn self_color(&self) -> Cell;
     fn set_color(&mut self, color: Cell);
     fn run_ai(&self) -> PlayerMove;
+    fn get_logfile(&self) -> LogFile;
 }

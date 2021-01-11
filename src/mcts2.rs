@@ -159,4 +159,7 @@ impl Bot for MCTSBot {
     fn run_ai(&self) -> PlayerMove {
         self.mcts()
     }
+    fn get_logfile(&self) -> LogFile {
+        self.log_file.clone()
+    }
 }

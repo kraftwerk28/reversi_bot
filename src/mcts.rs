@@ -58,6 +58,7 @@ impl MCTSBot {
     }
 
     fn mcts(&self) -> PlayerMove {
+        let now = Instant::now();
         let allowed_moves = self.board.allowed_moves(self.current_color);
         if allowed_moves.len() == 1 {
             return allowed_moves.first().unwrap().clone();
@@ -133,6 +134,8 @@ impl MCTSBot {
                 max_ratio = ratio;
             }
         }
+        log!(self, "time: {}ms", now.elapsed().as_millis(),);
+
         best_move.clone()
     }
 }
@@ -158,5 +161,8 @@ impl Bot for MCTSBot {
     }
     fn run_ai(&self) -> PlayerMove {
         self.mcts()
+    }
+    fn get_logfile(&self) -> LogFile {
+        self.log_file.clone()
     }
 }
