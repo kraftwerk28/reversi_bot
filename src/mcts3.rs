@@ -11,7 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub struct MCTSBot {
+pub struct MCTSMinimaxBot {
     board: Board,
     log_file: LogFile,
     move_maxtime: Duration,
@@ -20,9 +20,10 @@ pub struct MCTSBot {
     current_color: Cell,
     is_anti: bool,
     exploitation_value: f64,
+    minimax_threshold: i32,
 }
 
-impl MCTSBot {
+impl MCTSMinimaxBot {
     pub fn new(arg_matches: &clap::ArgMatches) -> Self {
         let black_hole = read_black_hole(arg_matches);
         let my_color = Chan::read().color();
@@ -41,18 +42,18 @@ impl MCTSBot {
             .value_of("exploitation_value")
             .map(str::parse::<f64>)
             .map(Result::unwrap)
-            .unwrap_or(2f64.sqrt());
+            .unwrap_or(2f64);
 
         let bot = Self {
             board,
             my_color,
             current_color,
             win_state: EndState::Unknown,
-
             log_file: get_logfile(&arg_matches),
             is_anti,
             move_maxtime: Duration::from_millis(move_maxtime),
             exploitation_value,
+            minimax_threshold: 5,
         };
 
         log!(bot, "alg: Advanced MCTS");
@@ -95,7 +96,7 @@ impl MCTSBot {
                     Some(pl_move.clone()),
                 );
 
-                while let Err(_) = stop_rx.try_recv() {
+                while stop_rx.try_recv().is_err() {
                     let selected =
                         Node::selection(tree.clone(), self.exploitation_value);
                     let expanded = Node::expansion(selected);
@@ -109,6 +110,7 @@ impl MCTSBot {
                 }
 
                 let node = tree.borrow();
+
                 (
                     (node.nwins, node.nvisits),
                     node.player_move.clone().unwrap(),
@@ -141,7 +143,7 @@ impl MCTSBot {
     }
 }
 
-impl Bot for MCTSBot {
+impl Bot for MCTSMinimaxBot {
     fn status(&self) -> EndState {
         self.win_state
     }

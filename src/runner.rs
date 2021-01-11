@@ -51,9 +51,9 @@ impl Runner {
             }
             bot.set_color(cur_color.opposite());
             // log!(self, "{:?}", self.board);
-            if let Some(logfile) = bot.get_logfile() {
-                logfile.lock().unwrap().flush().unwrap();
-            }
+        }
+        if let Some(logfile) = bot.get_logfile() {
+            logfile.lock().unwrap().flush().unwrap();
         }
     }
 

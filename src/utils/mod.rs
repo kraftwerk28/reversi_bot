@@ -331,9 +331,14 @@ pub fn parse_args() -> ArgMatches<'static> {
             Arg::with_name("bot_impl")
                 .long("bot-impl")
                 .takes_value(true)
-                .possible_values(&["minimax", "mcts_basic", "mcts"])
+                .possible_values(&[
+                    "minimax",
+                    "mcts_basic",
+                    "mcts",
+                    "mcts_minimax",
+                ])
                 .env("BOT_IMPL")
-                .default_value("mcts"),
+                .default_value("mcts_minimax"),
         )
         .arg(
             Arg::with_name("exploitation_value")
@@ -410,11 +415,12 @@ pub fn uct_score(parent_nvisits: u64, nwins: u64, nvisits: u64, c: f64) -> f64 {
 }
 
 pub fn select_bot_impl(matches: &ArgMatches) -> Box<dyn Bot> {
-    use crate::{mcts, mcts2, minimax};
+    use crate::{mcts, mcts2, mcts3, minimax};
     match matches.value_of("bot_impl").unwrap() {
         "minimax" => Box::new(minimax::MinimaxBot::new(matches)),
         "mcts_basic" => Box::new(mcts::MCTSBot::new(matches)),
         "mcts" => Box::new(mcts2::MCTSBot::new(matches)),
+        "mcts_minimax" => Box::new(mcts3::MCTSMinimaxBot::new(matches)),
         _ => unreachable!(),
     }
 }

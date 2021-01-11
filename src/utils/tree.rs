@@ -1,5 +1,5 @@
 use super::*;
-use rand::{thread_rng, Rng};
+use rand::random;
 use std::{
     cell::RefCell,
     rc::{Rc, Weak},
@@ -10,7 +10,7 @@ pub struct Node {
     pub color: Cell,
     pub nwins: u64,
     pub nvisits: u64,
-    pub children: Vec<Rc<RefCell<Node>>>,
+    pub children: Vec<NodeRef>,
     pub parent: Option<Weak<RefCell<Node>>>,
     pub player_move: Option<PlayerMove>,
     pub leaf: bool,
@@ -37,35 +37,36 @@ impl Node {
         Rc::new(RefCell::new(node))
     }
 
-    pub fn selection(mut noderef: NodeRef, exploitation_value: f64) -> NodeRef {
+    pub fn selection(noderef: NodeRef, exploitation_value: f64) -> NodeRef {
+        let mut selected = noderef;
         loop {
-            let rc = noderef.clone();
-            let borrowed = rc.borrow();
-            if borrowed.children.is_empty() || borrowed.leaf {
+            let rc = selected.clone();
+            let node = rc.borrow();
+
+            if node.children.is_empty() || node.leaf {
                 break;
             }
-            let nvisits = borrowed.nvisits;
+
             let mut max_score = f64::MIN;
-            for ch in borrowed.children.iter() {
+
+            for ch in node.children.iter() {
                 let child = ch.borrow();
                 let score = uct_score(
-                    nvisits,
+                    node.nvisits,
                     child.nwins,
                     child.nvisits,
                     exploitation_value,
                 );
                 if score > max_score {
                     max_score = score;
-                    noderef = ch.clone();
+                    selected = ch.clone();
                 }
             }
         }
-        noderef
+        selected
     }
 
     pub fn expansion(noderef: NodeRef) -> NodeRef {
-        let mut rng = thread_rng();
-
         let mut node = noderef.borrow_mut();
         assert!(node.children.is_empty());
         let allowed = node.board.allowed_moves(node.color);
@@ -74,8 +75,8 @@ impl Node {
             node.leaf = true;
             noderef.clone()
         } else {
+            let color = !node.color;
             for player_move in allowed.iter() {
-                let color = node.color.opposite();
                 let board = node.board.with_move(&player_move, node.color);
 
                 let child_node = Node {
@@ -88,34 +89,43 @@ impl Node {
                     player_move: Some(player_move.clone()),
                     leaf: false,
                 };
+
                 let noderc = Rc::new(RefCell::new(child_node));
                 node.children.push(noderc);
             }
-            let ind = rng.gen_range(0, allowed.len());
-            node.children[ind].clone()
-        }
-    }
 
-    pub fn back_propagate(mut noderef: NodeRef, winresult: EndState) {
-        loop {
-            {
-                let mut node = noderef.borrow_mut();
-                node.nvisits += 1;
-                if winresult.won(node.color.opposite()) {
-                    node.nwins += 1;
-                }
-            }
-            let cloned = noderef.clone();
-            if let Some(parent) = &cloned.borrow().parent {
-                noderef = parent.upgrade().unwrap();
-            } else {
-                break;
-            };
+            let idx = random::<usize>() % node.children.len();
+            node.children[idx].clone()
         }
     }
 
     pub fn simulate(&self, is_anti: bool) -> EndState {
         Board::simauto(self.board, self.color, is_anti)
+    }
+
+    pub fn back_propagate(
+        noderef: NodeRef,
+        winresult: EndState,
+        is_anti: bool,
+    ) {
+        let mut current = noderef;
+        loop {
+            {
+                let mut node = current.borrow_mut();
+                node.nvisits += 1;
+                let color = if is_anti { !node.color } else { node.color };
+                if winresult.won(color) {
+                    node.nwins += 1;
+                }
+            }
+
+            let cloned = current.clone();
+            if let Some(parent) = &cloned.borrow().parent {
+                current = parent.upgrade().unwrap();
+            } else {
+                break;
+            };
+        }
     }
 
     #[allow(dead_code)]

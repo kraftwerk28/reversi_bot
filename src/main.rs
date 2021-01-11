@@ -3,6 +3,7 @@ mod utils;
 mod bot;
 mod mcts;
 mod mcts2;
+mod mcts3;
 mod minimax;
 mod runner;
 
@@ -21,9 +22,7 @@ fn main() {
 
     let bot = select_bot_impl(&matches);
     let mut runner = Runner::new(bot);
-
     runner.run();
-    // bot.report();
 
     // Required to satisfy tester
     // But the tester still doesn't kill the process :(
