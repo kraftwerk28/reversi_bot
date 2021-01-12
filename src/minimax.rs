@@ -110,8 +110,8 @@ impl MinimaxBot {
 
         if depth == 0 || allowed_moves.is_empty() {
             let mul = if self.my_color == color { 1 } else { -1 };
-            // return sev3(&board, self.my_color) * mul;
-            return static_eval_with_weights_2(&board, self.my_color) * mul;
+            let is_even = self.max_tree_depth % 2 == 0;
+            return sev3(&board, self.my_color, is_even) * mul;
         }
 
         let (mut alpha, beta) = ab;

@@ -42,7 +42,7 @@ impl MCTSMinimaxBot {
             .value_of("exploitation_value")
             .map(str::parse::<f64>)
             .map(Result::unwrap)
-            .unwrap_or(2f64);
+            .unwrap_or(2f64.sqrt());
 
         let bot = Self {
             board,
