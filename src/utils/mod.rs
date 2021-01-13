@@ -2,6 +2,7 @@ pub mod board;
 pub mod point;
 pub mod sev;
 pub mod tree;
+pub mod tree2;
 
 use clap::{App, AppSettings, Arg, ArgMatches};
 use point::Point;
@@ -409,8 +410,10 @@ pub fn uct_score(parent_nvisits: u64, nwins: u64, nvisits: u64, c: f64) -> f64 {
     if nvisits == 0 {
         f64::MAX
     } else {
-        let xi = nwins as f64 / nvisits as f64;
-        xi + c * ((parent_nvisits as f64).ln() / nvisits as f64).sqrt()
+        let nvisits = nvisits as f64;
+        let parent_nvisits = parent_nvisits as f64;
+        let xi = nwins as f64 / nvisits;
+        xi + c * (parent_nvisits.ln() / nvisits).sqrt()
     }
 }
 

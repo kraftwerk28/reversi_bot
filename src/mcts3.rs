@@ -1,7 +1,7 @@
 use crate::{
     bot::Bot,
     utils::*,
-    utils::{board::Board, tree::Node},
+    utils::{board::Board, tree2::Node},
 };
 use crossbeam::channel;
 use rayon::prelude::*;
@@ -90,6 +90,7 @@ impl MCTSMinimaxBot {
             .par_iter()
             .map(|pl_move| {
                 let new_board = self.board.with_move(pl_move, self.my_color);
+
                 let tree = Node::new(
                     new_board,
                     self.my_color.opposite(),
