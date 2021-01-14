@@ -15,8 +15,8 @@ impl Runner {
     }
 
     pub fn run(&mut self) {
-        let bot = &mut self.bot;
         loop {
+            let bot = &mut self.bot;
             let allowed_moves = bot.allowed_tiles();
             let win_state = bot.status();
             let cur_color = bot.current_color();
@@ -50,27 +50,31 @@ impl Runner {
                 }
             }
             bot.set_color(cur_color.opposite());
-            // log!(self, "{:?}", self.board);
-        }
-        if let Some(logfile) = bot.get_logfile() {
-            logfile.lock().unwrap().flush().unwrap();
+            self.flush_logs();
         }
     }
 
-    //     fn report(&self) {
-    //         log!(
-    //             self,
-    //             "{}",
-    //             match self.win_state {
-    //                 EndState::Tie => "Tie!",
-    //                 EndState::BlackWon => "Black won!",
-    //                 EndState::WhiteWon => "White won!",
-    //                 _ => "Game hadn't been completed.",
-    //             }
-    //         );
-    //         if let Some(logfile) = &self.log_file {
-    //             let lck = logfile.lock().unwrap();
-    //             lck.borrow_mut().flush().unwrap();
-    //         }
-    //     }
+    fn flush_logs(&mut self) {
+        if let Some(logfile) = self.bot.get_logfile() {
+            let mut lck = logfile.lock().unwrap();
+            lck.flush().unwrap()
+        }
+    }
+
+    fn report(&self) {
+        // log!(
+        //     self,
+        //     "{}",
+        //     match self.win_state {
+        //         EndState::Tie => "Tie!",
+        //         EndState::BlackWon => "Black won!",
+        //         EndState::WhiteWon => "White won!",
+        //         _ => "Game hadn't been completed.",
+        //     }
+        // );
+        // if let Some(logfile) = &self.bot.get_logfile() {
+        //     let mut lck = logfile.lock().unwrap();
+        //     lck.flush().unwrap();
+        // }
+    }
 }

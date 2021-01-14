@@ -3,6 +3,8 @@ use point::Point;
 use rand::{prelude::*, rngs::ThreadRng, Rng};
 use std::fmt;
 
+use super::sev::sev3;
+
 #[derive(Copy, Clone)]
 pub struct Board(pub [Cell; 64]);
 
@@ -127,6 +129,62 @@ impl Board {
             let mv = allowed[rng.gen_range(0, allowed.len())].clone();
             board.apply_move(&mv, color);
             color = color.opposite();
+        }
+    }
+
+    #[inline]
+    pub fn sim_with_sev(
+        mut board: Board,
+        mut color: Cell,
+        is_anti: bool,
+        is_depth_even: bool,
+        bot_color: Cell,
+    ) -> EndState {
+        // let mut rng = thread_rng();
+        loop {
+            let mut allowed = board.allowed_moves(color);
+
+            if allowed.len() == 1 {
+                board.apply_move(&allowed.first().unwrap(), color);
+                color = !color;
+                continue;
+            }
+
+            let win = wincheck(&board, &allowed, is_anti, color);
+
+            if win.is_over() {
+                return win;
+            }
+
+            if allowed.is_empty() {
+                // Pass
+                color = !color;
+                allowed = board.allowed_moves(color);
+            }
+
+            let (mut best_move, mut best_score) = {
+                let fst_move = allowed.first().unwrap();
+                let board = board.with_move(fst_move, color);
+                let best_score = sev3(&board, bot_color, is_depth_even);
+                (fst_move, best_score)
+            };
+            let is_maxing = is_anti ^ (bot_color == color);
+
+            for player_move in allowed.iter() {
+                let temp_board = board.with_move(player_move, color);
+                let sev_score = sev3(&temp_board, bot_color, is_depth_even);
+                if (is_maxing && sev_score > best_score)
+                    || (!is_maxing && sev_score < best_score)
+                {
+                    best_move = player_move;
+                    best_score = sev_score;
+                }
+            }
+
+            // let mv = allowed[rng.gen_range(0, allowed.len())].clone();
+            // board.apply_move(&mv, color);
+            board.apply_move(best_move, color);
+            color = !color;
         }
     }
 

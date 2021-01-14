@@ -267,7 +267,7 @@ dependencies = [
 
 [[package]]
 name = "reversi_bot"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "clap",
  "crossbeam",

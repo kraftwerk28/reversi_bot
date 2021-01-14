@@ -73,15 +73,13 @@ impl MCTSMinimaxBot {
         }
 
         let (stop_tx, stop_rx) = channel::unbounded::<()>();
-
         let tim_thread = thread::spawn({
-            let max_time = self.move_maxtime;
             let stop_signals_count = allowed_moves.len();
+            let max_time = self.move_maxtime;
             move || {
-                let timer = Instant::now();
-                while timer.elapsed() < max_time {}
+                thread::sleep(max_time);
                 for _ in 0..stop_signals_count {
-                    stop_tx.send(()).unwrap();
+                    stop_tx.send(()).ok();
                 }
             }
         });
@@ -100,9 +98,16 @@ impl MCTSMinimaxBot {
                 while stop_rx.try_recv().is_err() {
                     let selected =
                         Node::selection(tree.clone(), self.exploitation_value);
-                    let expanded = Node::expansion(selected);
-                    let rollout_result =
-                        expanded.borrow().simulate(self.is_anti);
+
+                    let expanded = Node::expansion(selected, self.is_anti);
+
+                    let rollout_result = Node::simulate(
+                        expanded.clone(),
+                        self.is_anti,
+                        false,
+                        self.my_color,
+                    );
+
                     Node::back_propagate(
                         expanded,
                         rollout_result,
@@ -134,6 +139,7 @@ impl MCTSMinimaxBot {
         let mut max_score = f64::MIN;
         let mut best_move = &scores[0].1;
         for ((w, v), player_move) in scores.iter() {
+            // let score = *v as f64;
             let score = *w as f64 / *v as f64;
             if score > max_score {
                 max_score = score;

@@ -8,12 +8,13 @@ use std::{
 pub struct Node {
     pub board: Board,
     pub color: Cell,
-    pub nwins: u64,
-    pub nvisits: u64,
-    pub children: Vec<NodeRef>,
+    pub children: Vec<Rc<RefCell<Node>>>,
     pub parent: Option<Weak<RefCell<Node>>>,
     pub player_move: Option<PlayerMove>,
     pub leaf: bool,
+
+    pub nwins: u64,
+    pub nvisits: u64,
 }
 
 pub type NodeRef = Rc<RefCell<Node>>;
@@ -34,8 +35,72 @@ impl Node {
             player_move,
             leaf: false,
         };
-        Rc::new(RefCell::new(node))
+        let rc = Rc::new(RefCell::new(node));
+        rc
     }
+
+    //     pub fn selection(noderef: NodeRef, my_color: Cell) {
+    //         let mut current = noderef;
+    //         loop {
+    //             let rc = current.clone();
+    //             let node = rc.borrow();
+
+    //             if node.children.is_empty() || node.leaf {
+    //                 // ...
+    //                 return;
+    //             }
+
+    //             if node.children.is_empty() {
+    //                 Node::expansion(noderef, node.color);
+    //                 return;
+    //             } else {
+    //                 // not expandable
+    //                 let mut chosen_child = node.children.first().unwrap().clone();
+    //                 if node.color == my_color {
+    //                     let mut max_ucb = chosen_child.borrow().ucb;
+    //                     for ch in node.children.iter() {
+    //                         let ucb = ch.borrow().ucb;
+    //                         if ucb > max_ucb {
+    //                             chosen_child = ch.clone();
+    //                             max_ucb = ucb;
+    //                         }
+    //                     }
+    //                 } else {
+    //                     let mut min_lcb = chosen_child.borrow().lcb;
+    //                     for ch in node.children.iter() {
+    //                         let lcb = ch.borrow().ucb;
+    //                         if lcb > min_lcb {
+    //                             chosen_child = ch.clone();
+    //                             min_lcb = lcb;
+    //                         }
+    //                     }
+    //                 }
+    //                 current = chosen_child;
+    //             }
+    //         }
+    //     }
+
+    // pub fn expansion(noderef: NodeRef, color: Cell) {
+    //     let node = noderef.borrow();
+    //     assert!(!node.children.is_empty());
+    //     let allowed_moves = node.board.allowed_moves(color);
+    //     for player_move in allowed_moves.iter() {
+    //         let child_node = Node {
+    //             board: node.board.with_move(player_move, color),
+    //             children: vec![],
+    //             color: !color,
+    //             lcb: 0,
+    //             ucb: 0,
+    //             leaf: false,
+    //             parent: Some(Rc::downgrade(&noderef)),
+    //             nvisits: 0,
+    //             nwins: 0,
+    //             player_move: Some(player_move.clone()),
+    //         };
+    //         child_node.simulate();
+    //         child_node.backpropagate();
+    //     }
+    // }
 
     pub fn selection(noderef: NodeRef, exploitation_value: f64) -> NodeRef {
         let root_color = {
@@ -52,11 +117,40 @@ impl Node {
                 break;
             }
 
-            let mut best_score = if node.color == root_color {
-                f64::MIN
-            } else {
-                f64::MAX
-            };
+//             selected = node.children.first().unwrap().clone();
+//             let mut best_score = {
+//                 let fst = selected.borrow();
+//                 let (lcb, ucb) = get_LCB_UCB(
+//                     node.nvisits,
+//                     fst.nwins,
+//                     fst.nvisits,
+//                     exploitation_value,
+//                 );
+//                 if node.color == root_color {
+//                     ucb
+//                 } else {
+//                     lcb
+//                 }
+//             };
+
+//             for ch in node.children.iter() {
+//                 let child = ch.borrow();
+//                 let (lcb, ucb) = get_LCB_UCB(
+//                     node.nvisits,
+//                     child.nwins,
+//                     child.nvisits,
+//                     exploitation_value,
+//                 );
+//                 if node.color == root_color && ucb > best_score {
+//                     best_score = ucb;
+//                     selected = ch.clone();
+//                 } else if node.color != root_color && lcb < best_score {
+//                     best_score = lcb;
+//                     selected = ch.clone();
+//                 }
+//             }
+
+            let mut max_score = f64::MIN;
 
             for ch in node.children.iter() {
                 let child = ch.borrow();
@@ -66,10 +160,8 @@ impl Node {
                     child.nvisits,
                     exploitation_value,
                 );
-                if (node.color == root_color && score > best_score)
-                    || (node.color != root_color && score < best_score)
-                {
-                    best_score = score;
+                if score > max_score {
+                    max_score = score;
                     selected = ch.clone();
                 }
             }
@@ -77,7 +169,7 @@ impl Node {
         selected
     }
 
-    pub fn expansion(noderef: NodeRef) -> NodeRef {
+    pub fn expansion(noderef: NodeRef, _is_anti: bool) -> NodeRef {
         let mut node = noderef.borrow_mut();
         assert!(node.children.is_empty());
         let allowed = node.board.allowed_moves(node.color);
@@ -101,8 +193,8 @@ impl Node {
                     leaf: false,
                 };
 
-                let noderc = Rc::new(RefCell::new(child_node));
-                node.children.push(noderc);
+                let rc = Rc::new(RefCell::new(child_node));
+                node.children.push(rc);
             }
 
             let idx = random::<usize>() % node.children.len();
@@ -110,8 +202,21 @@ impl Node {
         }
     }
 
-    pub fn simulate(&self, is_anti: bool) -> EndState {
-        Board::simauto(self.board, self.color, is_anti)
+    pub fn simulate(
+        noderef: NodeRef,
+        is_anti: bool,
+        is_depth_even: bool,
+        bot_color: Cell,
+    ) -> EndState {
+        let node = noderef.borrow();
+        Board::sim_with_sev(
+            node.board,
+            node.color,
+            is_anti,
+            is_depth_even,
+            bot_color,
+        )
+        // Board::simauto(node.board, node.color, is_anti)
     }
 
     pub fn back_propagate(
@@ -138,6 +243,35 @@ impl Node {
             };
         }
     }
+
+    // pub fn calc_minimax(noderef: NodeRef, my_color: Cell) {
+    //     let mut node = noderef.borrow_mut();
+    //     let mut next_minimax_child = node.minimax_child;
+    //     if node.children.is_empty() || node.nvisits < node.backup_threshold {
+    //         node.minimax_child = Rc::downgrade(&noderef);
+    //         return;
+    //     }
+    //     let mut max_value = f64::MIN;
+    //     let mut min_value = f64::MAX;
+
+    //     for ch in node.children.iter() {
+    //         let child = ch.borrow();
+    //         if node.color == my_color && child.mean > max_value {
+    //             if let Some(mm_child) = child.minimax_child.upgrade() {
+    //                 let mm_child = mm_child.borrow();
+    //                 max_value = mm_child.mean;
+    //                 next_minimax_child = mm_child.minimax_child.clone();
+    //             }
+    //         } else if node.color != my_color && child.mean < min_value {
+    //             if let Some(mm_child) = child.minimax_child.upgrade() {
+    //                 let mm_child = mm_child.borrow();
+    //                 min_value = mm_child.mean;
+    //                 next_minimax_child = mm_child.minimax_child.clone();
+    //             }
+    //         }
+    //     }
+    //     node.minimax_child = next_minimax_child;
+    // }
 
     #[allow(dead_code)]
     pub fn best_child(&self) -> NodeRef {

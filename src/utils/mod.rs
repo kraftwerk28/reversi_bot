@@ -20,7 +20,7 @@ use self::board::Board;
 // A small logging util
 macro_rules! log {
     ($slf:ident, $($fmtargs:expr),+ $(,)*) => {
-        if let Some(log_file) = &$slf.log_file {
+        if let Some(log_file) = &$slf.get_logfile() {
             let mut lck = log_file.lock().unwrap();
             writeln!(lck, $($fmtargs),+).unwrap();
         }
@@ -252,7 +252,7 @@ pub fn get_allowed_moves(board: &Board, color: Cell) -> AllowedMoves {
 
         for (dx, dy) in TRAVERSE_DIRECTIONS.iter() {
             let (mut x, mut y) = (x + dx, y + dy);
-            let mut to_be_flipped: Vec<Point> = Vec::with_capacity(6);
+            let mut to_be_flipped: Vec<Point> = Vec::with_capacity(7);
             let range = 0..8;
 
             while range.contains(&x) && range.contains(&y) {
@@ -339,7 +339,7 @@ pub fn parse_args() -> ArgMatches<'static> {
                     "mcts_minimax",
                 ])
                 .env("BOT_IMPL")
-                .default_value("mcts_minimax"),
+                .default_value("mcts"),
         )
         .arg(
             Arg::with_name("exploitation_value")
@@ -360,7 +360,7 @@ pub fn get_logfile(matches: &ArgMatches) -> LogFile {
             .write(true)
             .open(name)
             .map(|f| Arc::new(Mutex::new(BufWriter::new(f))))
-            .unwrap()
+            .expect("Opened file for logging")
     })
 }
 
@@ -415,6 +415,20 @@ pub fn uct_score(parent_nvisits: u64, nwins: u64, nvisits: u64, c: f64) -> f64 {
         let xi = nwins as f64 / nvisits;
         xi + c * (parent_nvisits.ln() / nvisits).sqrt()
     }
+}
+
+#[allow(non_snake_case)]
+pub fn get_LCB_UCB(
+    parent_nvisits: u64,
+    nwins: u64,
+    nvisits: u64,
+    exploration: f64,
+) -> (f64, f64) {
+    let (nwins, nvisits, parent_nvisits) =
+        (nwins as f64, nvisits as f64, parent_nvisits as f64);
+    let mean = nwins / nvisits;
+    let exploration = exploration * (parent_nvisits.ln() / nvisits);
+    (mean - exploration, mean + exploration)
 }
 
 pub fn select_bot_impl(matches: &ArgMatches) -> Box<dyn Bot> {

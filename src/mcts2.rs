@@ -77,8 +77,7 @@ impl MCTSBot {
             let max_time = self.move_maxtime;
             let stop_signals_count = allowed_moves.len();
             move || {
-                let timer = Instant::now();
-                while timer.elapsed() < max_time {}
+                thread::sleep(max_time);
                 for _ in 0..stop_signals_count {
                     stop_tx.send(()).unwrap();
                 }
